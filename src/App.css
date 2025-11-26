@@ -20,13 +20,14 @@ body {
 
 /* --- LAYOUT UTILITIES --- */
 .app-container {
-  max-width: 480px;
+  width: 100%;             /* Force full width */
+  max-width: 600px;        /* Increased limit for tablets/large phones */
   margin: 0 auto;
   min-height: 100vh;
-  background: var(--bg-dark); /* Dark BG */
+  background: var(--bg-dark);
   position: relative;
   padding-bottom: 80px;
-  box-shadow: 0 0 20px rgba(0,0,0,0.5); /* Stronger shadow for dark mode */
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
 }
 
 .coach-container {
@@ -156,9 +157,9 @@ body {
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 100%;
-  max-width: 480px;
-  background: #2d3748; /* Dark Nav */
+  width: 100%;             /* Force full width */
+  max-width: 600px;        /* Match the container limit */
+  background: #2d3748;
   display: flex;
   justify-content: space-around;
   padding: 12px 0;
