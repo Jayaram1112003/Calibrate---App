@@ -359,16 +359,16 @@ function CoachApp({ user }) {
 function CoachClientDetail({ client, coachEmail }) {
   const [logs, setLogs] = useState([]);
   
-  // FIX: Fetch logs for client, NO orderBy to avoid index error
+  // FIX: Fetch logs AND capture the ID so React knows what to delete
   useEffect(() => {
     const q = query(
       collection(db, "food_logs"), 
       where("user_email", "==", client.email)
-      // Removed orderBy("timestamp") to fix blank screen
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(d => d.data());
-      // Sort manually in JS
+      // capture doc.id here
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Sort manually (Newest first)
       data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
       setLogs(data);
     });
@@ -385,7 +385,6 @@ function CoachClientDetail({ client, coachEmail }) {
     a.click();
   };
 
-  // FIX: Coach looks at users/{clientEmail}/messages
   const chatPath = `users/${client.email}/messages`;
 
   return (
@@ -401,8 +400,12 @@ function CoachClientDetail({ client, coachEmail }) {
         {/* Left: Food Logs */}
         <div style={{flex:1, overflowY:'auto', border:'1px solid #334155', borderRadius:'8px', padding:'15px', background:'#1a1d23'}}>
           <h3 style={{color:'#94a3b8', borderBottom:'1px solid #334155', paddingBottom:'10px'}}>Recent Food Logs</h3>
-          {logs.map((log, i) => (
-            <div key={i} style={{padding:'10px', borderBottom:'1px solid #2d3748'}}>
+          
+          {logs.length === 0 && <div style={{padding:'20px', color:'#666', fontStyle:'italic'}}>No logs found</div>}
+
+          {/* FIX: Use log.id as key instead of index (i) */}
+          {logs.map((log) => (
+            <div key={log.id} style={{padding:'10px', borderBottom:'1px solid #2d3748'}}>
               <div style={{fontSize:'0.8rem', color:'#64748b'}}>{log.date_string} - {log.meal}</div>
               <div style={{fontWeight:'500'}}>{log.item}</div>
               <div style={{color:'#5daca5'}}>{log.quantity}</div>
