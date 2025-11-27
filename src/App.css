@@ -19,10 +19,10 @@ html, body {
   padding: 0;
   width: 100%;
   height: 100%;
-  background-color: var(--bg-dark);
-  /* Use safe-area-inset to respect the notch/status bar */
-  padding-top: env(safe-area-inset-top); 
-  overflow: hidden; /* Lock the outer body */
+  /* CRITICAL: Make the whole phone screen dark, not just the app box */
+  background-color: #1a1d23; 
+  padding-top: env(safe-area-inset-top);
+  overflow: hidden; 
 }
 
 /* --- LAYOUT UTILITIES --- */
@@ -290,4 +290,33 @@ input, select {
   background: #2d3748;
   color: white;
   border: 1px solid var(--border-color);
+}
+
+/* --- NEW CHAT STYLES --- */
+.msg-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  width: 100%;
+}
+.msg-row.mine {
+  justify-content: flex-end; /* Push my messages to right */
+}
+.msg-row.theirs {
+  justify-content: flex-start; /* Push coach messages to left */
+}
+
+/* The Delete Button (Outside the bubble) */
+.delete-btn-outside {
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  opacity: 0.4;
+  cursor: pointer;
+  margin-right: 8px; /* Space between trash and bubble */
+  padding: 5px;
+}
+.delete-btn-outside:hover {
+  opacity: 1;
+  transform: scale(1.1);
 }

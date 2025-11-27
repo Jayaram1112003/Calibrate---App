@@ -138,18 +138,11 @@ function ClientHome({ user, setTab }) {
         <p style={{color:'#94a3b8'}}>Ready to crush your goals today?</p>
         
         <div className="stats-row">
-          <div className="stat-card">
-             <span style={{fontSize:'1.5rem'}}>🔥</span>
-             <div>
-               <div style={{fontSize:'0.7rem', color:'#94a3b8'}}>STREAK</div>
-               <div style={{fontWeight:'bold'}}>3 Days</div>
-             </div>
-          </div>
-          <div className="stat-card">
+          <div className="stat-card" style={{justifyContent:'center', textAlign:'center'}}>
              <span style={{fontSize:'1.5rem'}}>🍴</span>
              <div>
-               <div style={{fontSize:'0.7rem', color:'#94a3b8'}}>LOGS TODAY</div>
-               <div style={{fontWeight:'bold'}}>0</div>
+               <div style={{fontSize:'0.7rem', color:'#94a3b8'}}>MEALS LOGGED TODAY</div>
+               <div style={{fontWeight:'bold'}}>Check Log Tab</div>
              </div>
           </div>
         </div>
@@ -433,14 +426,9 @@ function ChatInterface({ currentUserEmail, chatPath }) {
   const dummyDiv = useRef(null);
 
   useEffect(() => {
-    // Determine if we should sort. 
-    // If you haven't set up the Index yet, removing 'orderBy' prevents the crash.
-    // We sort manually in JS below to be safe.
     const q = query(collection(db, chatPath));
-    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const msgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Sort by time (Oldest at top)
       msgs.sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
       setMessages(msgs);
       setTimeout(() => dummyDiv.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -454,15 +442,13 @@ function ChatInterface({ currentUserEmail, chatPath }) {
       text: input,
       sender: currentUserEmail,
       timestamp: serverTimestamp(),
-      isDeleted: false // New flag
+      isDeleted: false
     });
     setInput("");
   };
 
-  // NEW: "Soft Delete" function
   const deleteMessage = async (msgId) => {
-    if(!window.confirm("Delete this message?")) return;
-    
+    if(!window.confirm("Delete this message permanently?")) return;
     const msgRef = doc(db, chatPath, msgId);
     await updateDoc(msgRef, {
       text: "🚫 Message deleted",
@@ -477,28 +463,28 @@ function ChatInterface({ currentUserEmail, chatPath }) {
         
         {messages.map((m) => {
           const isMine = m.sender === currentUserEmail;
+          
           return (
-            <div 
-              key={m.id} 
-              className={`message-bubble ${isMine ? 'msg-mine' : 'msg-theirs'}`}
-              style={m.isDeleted ? {fontStyle:'italic', opacity:0.6, background:'#333', border:'1px solid #444'} : {}}
-            >
-              {m.text}
+            <div key={m.id} className={`msg-row ${isMine ? 'mine' : 'theirs'}`}>
               
-              {/* Only show Trash icon if: It's MY message AND it's NOT already deleted */}
+              {/* DELETE BUTTON (Now appearing to the LEFT of the bubble) */}
               {isMine && !m.isDeleted && (
-                <span 
+                <button 
+                  className="delete-btn-outside" 
                   onClick={() => deleteMessage(m.id)}
-                  style={{
-                    marginLeft:'10px', 
-                    cursor:'pointer', 
-                    fontSize:'0.8rem', 
-                    opacity:0.5
-                  }}
+                  aria-label="Delete message"
                 >
                   🗑️
-                </span>
+                </button>
               )}
+
+              {/* The Bubble */}
+              <div 
+                className={`message-bubble ${isMine ? 'msg-mine' : 'msg-theirs'}`}
+                style={m.isDeleted ? {fontStyle:'italic', opacity:0.6, background:'#333', border:'1px solid #444'} : {}}
+              >
+                {m.text}
+              </div>
             </div>
           );
         })}
