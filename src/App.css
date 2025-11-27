@@ -9,13 +9,20 @@
   --border-color: #334155;
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background-color: var(--bg-dark);
-  color: var(--text-main);
+/* --- GLOBAL & RESET --- */
+html, body {
   margin: 0;
   padding: 0;
-  -webkit-font-smoothing: antialiased;
+  width: 100%;
+  height: 100%;
+  /* These lines stop the "Rubber Band" bounce effect */
+  overflow: hidden; 
+  overscroll-behavior-y: none;
+  background-color: var(--bg-dark);
+}
+
+#root {
+  height: 100%;
 }
 
 /* --- LAYOUT UTILITIES --- */
@@ -37,7 +44,13 @@ body {
   display: flex;
   flex-direction: column;
   width: 100%;
-  overflow: hidden; /* Keeps scrolling inside the page, not the whole body */
+  
+  /* CRITICAL: This allows the content to scroll, but keeps the header fixed */
+  overflow-y: auto; 
+  overflow-x: hidden;
+  
+  /* Smooth scrolling for iPhone */
+  -webkit-overflow-scrolling: touch; 
 }
 
 .coach-container {
@@ -218,14 +231,13 @@ body {
 
 /* --- CHAT --- */
 .chat-window {
-  flex: 1;        /* <--- ADD THIS LINE */
+  height: 100%; /* Forces it to fill the flex container */
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border-color);
-  border-radius: 8px;
   margin-top: 20px;
   background: #1a1d23;
-  overflow: hidden; /* Prevents double scrollbars */
+  overflow: hidden; /* Prevents double scrolling */
 }
 .messages-area {
   flex: 1;
