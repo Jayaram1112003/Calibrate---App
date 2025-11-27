@@ -22,12 +22,14 @@ body {
 .app-container {
   width: 100vw !important;        /* Force full Viewport Width */
   max-width: 100% !important;     /* Remove any limits */
-  min-height: 100vh;
-  margin: 0;
+  min-height: 100dvh;       /* CHANGED: 100dvh forces full mobile height */
+  height: 100%;             /* ADDED: Ensures it fills parent */
   background: var(--bg-dark);
   position: relative;
   padding-bottom: 80px;
-  overflow-x: hidden;             /* Prevent side scrolling */
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  display: flex;            /* ADDED: Helps stretch content */
+  flex-direction: column;   /* ADDED */
 }
 
 .coach-container {

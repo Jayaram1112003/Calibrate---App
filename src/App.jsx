@@ -433,11 +433,14 @@ function ChatInterface({ currentUserEmail, chatPath }) {
   const dummyDiv = useRef(null);
 
   useEffect(() => {
-    // Now we use the specific path passed down
-    const q = query(collection(db, chatPath), window.orderBy ? window.orderBy("timestamp", "asc") : undefined);
-    // Simple snapshot for now, we will sort in JS to be safe
-    const unsubscribe = onSnapshot(collection(db, chatPath), (snapshot) => {
-      const msgs = snapshot.docs.map(d => d.data());
+    // Determine if we should sort. 
+    // If you haven't set up the Index yet, removing 'orderBy' prevents the crash.
+    // We sort manually in JS below to be safe.
+    const q = query(collection(db, chatPath));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const msgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Sort by time (Oldest at top)
       msgs.sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
       setMessages(msgs);
       setTimeout(() => dummyDiv.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -450,22 +453,58 @@ function ChatInterface({ currentUserEmail, chatPath }) {
     await addDoc(collection(db, chatPath), {
       text: input,
       sender: currentUserEmail,
-      timestamp: serverTimestamp()
+      timestamp: serverTimestamp(),
+      isDeleted: false // New flag
     });
     setInput("");
   };
 
+  // NEW: "Soft Delete" function
+  const deleteMessage = async (msgId) => {
+    if(!window.confirm("Delete this message?")) return;
+    
+    const msgRef = doc(db, chatPath, msgId);
+    await updateDoc(msgRef, {
+      text: "🚫 Message deleted",
+      isDeleted: true
+    });
+  };
+
   return (
-    <div className="chat-window" style={{height:'100%', marginTop:0}}>
-      <div className="messages-area">
+    <div className="chat-window" style={{height:'100%', marginTop:0, display:'flex', flexDirection:'column'}}>
+      <div className="messages-area" style={{flex:1}}>
         {messages.length === 0 && <div style={{textAlign:'center', marginTop:'50px', color:'#555'}}>No messages yet</div>}
-        {messages.map((m, i) => (
-          <div key={i} className={`message-bubble ${m.sender === currentUserEmail ? 'msg-mine' : 'msg-theirs'}`}>
-            {m.text}
-          </div>
-        ))}
+        
+        {messages.map((m) => {
+          const isMine = m.sender === currentUserEmail;
+          return (
+            <div 
+              key={m.id} 
+              className={`message-bubble ${isMine ? 'msg-mine' : 'msg-theirs'}`}
+              style={m.isDeleted ? {fontStyle:'italic', opacity:0.6, background:'#333', border:'1px solid #444'} : {}}
+            >
+              {m.text}
+              
+              {/* Only show Trash icon if: It's MY message AND it's NOT already deleted */}
+              {isMine && !m.isDeleted && (
+                <span 
+                  onClick={() => deleteMessage(m.id)}
+                  style={{
+                    marginLeft:'10px', 
+                    cursor:'pointer', 
+                    fontSize:'0.8rem', 
+                    opacity:0.5
+                  }}
+                >
+                  🗑️
+                </span>
+              )}
+            </div>
+          );
+        })}
         <div ref={dummyDiv}></div>
       </div>
+
       <div className="chat-input-area">
         <input 
           className="chat-input" 
