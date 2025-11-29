@@ -20,12 +20,17 @@ html, body {
 
 /* --- LAYOUT UTILITIES --- */
 .app-container {
-  width: 100%; max-width: 600px; margin: 0 auto;
-  min-height: 100dvh; height: 100%;
+  width: 100%; 
+  max-width: 100%;         /* CHANGED: Was 600px. Now forces full width. */
+  margin: 0 auto;
+  min-height: 100dvh; 
+  height: 100%;
   background: #1a1d23;
-  position: relative; padding-bottom: 80px;
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
-  display: flex; flex-direction: column;
+  position: relative; 
+  padding-bottom: 80px;
+  box-shadow: none;        /* REMOVED: Shadow isn't needed if full screen */
+  display: flex; 
+  flex-direction: column;
 }
 
 .app-container > div:not(.bottom-nav) {
