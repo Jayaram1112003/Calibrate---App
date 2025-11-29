@@ -331,6 +331,7 @@ function ClientProfile({ user, phaseInfo }) {
 // --- COACH APP ---
 // --- COACH APP (Mobile Friendly Version) ---
 // --- COACH APP (Fixed Layout) ---
+// --- COACH APP (Gap Fixed) ---
 function CoachApp({ user }) {
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -338,8 +339,10 @@ function CoachApp({ user }) {
   useEffect(() => {
     const fetchClients = async () => {
       const q = query(collection(db, "users"), where("role", "==", "client"));
-      const snapshot = await getDocs(q);
-      setClients(snapshot.docs.map(doc => ({ email: doc.id, ...doc.data() })));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setClients(snapshot.docs.map(doc => ({ email: doc.id, ...doc.data() })));
+      });
+      return () => unsubscribe();
     };
     fetchClients();
   }, []);
@@ -364,8 +367,8 @@ function CoachApp({ user }) {
         </select>
       </div>
 
-      {/* FIXED: Added justifyContent: 'flex-start' to remove the gap */}
-      <div style={{flex:1, overflow:'hidden', display:'flex', flexDirection:'column', justifyContent:'flex-start'}}>
+      {/* NEW CLASS: .coach-content-wrapper forces top alignment */}
+      <div className="coach-content-wrapper">
         {selectedClient ? (
           <CoachClientDetail client={selectedClient} coachEmail={user.email} />
         ) : (
@@ -383,6 +386,7 @@ function CoachApp({ user }) {
 function CoachClientDetail({ client, coachEmail }) {
   const [logs, setLogs] = useState([]);
   const [workout, setWorkout] = useState("No workout logged");
+  // FIX: Sync phaseId with the client prop whenever it changes
   const [phaseId, setPhaseId] = useState(client.currentPhase || 1);
   const [activeTab, setActiveTab] = useState('logs'); 
 
@@ -403,7 +407,9 @@ function CoachClientDetail({ client, coachEmail }) {
       else setWorkout("No workout logged today");
     });
 
+    // 3. FORCE UPDATE PHASE from prop (Fixes the Phase 1 vs 2 mismatch)
     setPhaseId(client.currentPhase || 1);
+
     return () => { unsub(); unsubW(); };
   }, [client]);
 
@@ -419,7 +425,7 @@ function CoachClientDetail({ client, coachEmail }) {
       currentPhase: nextPhase,
       celebratePromotion: direction === 1 
     });
-    setPhaseId(nextPhase);
+    // State will update automatically via the useEffect above listening to 'client' update
     alert(`Client ${action}d!`);
   };
 
@@ -432,13 +438,13 @@ function CoachClientDetail({ client, coachEmail }) {
   };
 
   return (
-    /* FIXED: Added justifyContent: 'flex-start' here too */
-    <div style={{height:'100%', display:'flex', flexDirection:'column', background:'#1a1d23', justifyContent:'flex-start'}}>
+    <div style={{flex:1, display:'flex', flexDirection:'column', background:'#1a1d23', overflow:'hidden'}}>
       
-      <div style={{padding:'15px', background:'#252a33', borderBottom:'1px solid #334155'}}>
+      {/* Client Info Card - Zero Top Margin */}
+      <div style={{padding:'15px', background:'#252a33', borderBottom:'1px solid #334155', marginTop:0}}>
         <div style={{fontSize:'0.9rem', color:'#94a3b8', marginBottom:'5px'}}>CURRENTLY AT</div>
         <div style={{fontSize:'1.1rem', fontWeight:'bold', color:'white', marginBottom:'15px'}}>
-          {PHASES[phaseId].name}
+          {PHASES[phaseId]?.name || "Phase 1: The Audit"}
         </div>
         
         <div style={{display:'flex', gap:'10px', flexWrap:'wrap'}}>
@@ -448,14 +454,16 @@ function CoachClientDetail({ client, coachEmail }) {
         </div>
       </div>
 
-      <div style={{display:'flex', borderBottom:'1px solid #334155'}}>
+      {/* Tabs */}
+      <div style={{display:'flex', borderBottom:'1px solid #334155', flexShrink: 0}}>
         <button onClick={() => setActiveTab('logs')} style={{flex:1, padding:'15px', background: activeTab==='logs' ? '#2d3748' : 'transparent', color: activeTab==='logs'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold', cursor:'pointer'}}>Food & Workout</button>
         <button onClick={() => setActiveTab('chat')} style={{flex:1, padding:'15px', background: activeTab==='chat' ? '#2d3748' : 'transparent', color: activeTab==='chat'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold', cursor:'pointer'}}>Chat</button>
       </div>
 
-      <div style={{flex:1, overflow:'hidden', position:'relative'}}>
+      {/* Content Area */}
+      <div style={{flex:1, overflow:'hidden', position:'relative', display:'flex', flexDirection:'column'}}>
         {activeTab === 'logs' && (
-          <div style={{height:'100%', overflowY:'auto', padding:'15px'}}>
+          <div style={{flex:1, overflowY:'auto', padding:'15px'}}>
              <div style={{background:'#2d3748', padding:'15px', borderRadius:'8px', marginBottom:'20px', border:'1px solid #334155'}}>
                 <div style={{fontSize:'0.8rem', color:'#94a3b8', marginBottom:'5px'}}>TODAY'S WORKOUT</div>
                 <div style={{color:'white', whiteSpace:'pre-wrap'}}>{workout}</div>

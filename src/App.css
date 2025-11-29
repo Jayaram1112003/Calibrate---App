@@ -169,3 +169,15 @@ html, body {
   font-size: 1rem;
   outline: none;
 }
+
+/* --- COACH LAYOUT FIX --- */
+.coach-content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start !important; /* Force content to top */
+  overflow: hidden;
+  width: 100%;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
