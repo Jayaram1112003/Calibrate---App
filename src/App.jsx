@@ -333,6 +333,7 @@ function ClientProfile({ user, phaseInfo }) {
 // --- COACH APP (Fixed Layout) ---
 // --- COACH APP (Gap Fixed) ---
 // --- COACH APP (Gap Destroyed) ---
+// --- COACH APP (Gap Fixed v2) ---
 function CoachApp({ user }) {
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -355,9 +356,9 @@ function CoachApp({ user }) {
   };
 
   return (
-    <div className="app-container animate-page" style={{display:'flex', flexDirection:'column', height:'100dvh'}}>
+    <div className="app-container animate-page" style={{display:'flex', flexDirection:'column', height:'100dvh', justifyContent:'flex-start'}}>
       
-      {/* HEADER: Sticky at top */}
+      {/* HEADER */}
       <div className="top-header" style={{flexShrink:0, zIndex:100}}>
         <h1>Coach Dashboard</h1>
         <select className="coach-select" onChange={handleSelect} value={selectedClient?.email || ""}>
@@ -370,24 +371,23 @@ function CoachApp({ user }) {
         </select>
       </div>
 
-      {/* BODY: Force it to start immediately below header */}
+      {/* CONTENT - Forced to top with no margins */}
       <div style={{
         flex: 1, 
+        overflow: 'hidden', 
         display: 'flex', 
-        flexDirection: 'column', 
-        justifyContent: 'flex-start', /* SNAP TO TOP */
-        marginTop: 0, 
-        paddingTop: 0, 
-        overflow: 'hidden',
-        background: '#1a1d23'
+        flexDirection: 'column',
+        justifyContent: 'flex-start',
+        marginTop: 0,
+        paddingTop: 0
       }}>
         {selectedClient ? (
           <CoachClientDetail client={selectedClient} coachEmail={user.email} />
         ) : (
-          <div style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', color:'#64748b', padding:'20px', textAlign:'center'}}>
-            <div style={{fontSize:'3rem', marginBottom:'20px'}}>📋</div>
-            <p>Select a client from the menu above.</p>
-            <button onClick={() => signOut(auth)} style={{marginTop:'30px', border:'none', background:'none', color:'#ef4444', cursor:'pointer', fontSize:'1rem'}}>Logout</button>
+          <div style={{marginTop:'50px', textAlign:'center', color:'#64748b', padding:'20px'}}>
+             <div style={{fontSize:'3rem', marginBottom:'20px'}}>📋</div>
+             <p>Select a client above to begin.</p>
+             <button onClick={() => signOut(auth)} style={{marginTop:'30px', border:'none', background:'none', color:'#ef4444', cursor:'pointer'}}>Logout</button>
           </div>
         )}
       </div>
