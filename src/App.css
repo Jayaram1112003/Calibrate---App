@@ -1,189 +1,71 @@
-/* --- GLOBAL RESET & FORCE FULL SCREEN --- */
-/* --- GLOBAL RESET & FORCE TOP ALIGNMENT --- */
-* {
-  box-sizing: border-box;
-}
+/* --- UNIVERSAL LOCKDOWN --- */
+* { box-sizing: border-box; }
 
-html, body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
+html, body, #root {
+  margin: 0; padding: 0;
+  width: 100%; height: 100%;
   background-color: #1a1d23;
-  padding-top: env(safe-area-inset-top);
-  overflow: hidden;
-  
-  /* CRITICAL: These 3 lines kill the "Mystery Gap" */
-  display: block !important;
-  place-items: start !important;
-  justify-content: flex-start !important;
+  overflow: hidden; /* Stop the whole page from scrolling */
+  position: fixed; /* Lock the screen in place */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #e2e8f0;
 }
 
-#root {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  /* CRITICAL: Force the React Root to start at the top */
-  justify-content: flex-start !important; 
-}
-
-/* --- APP CONTAINER (The "Phone" View) --- */
-.app-container {
-  /* FORCE FULL WIDTH */
-  width: 100vw !important; 
-  max-width: none !important;
-  min-width: 100% !important;
-  
-  /* FORCE FULL HEIGHT */
-  height: 100dvh; 
-  min-height: 100%;
-  
-  margin: 0;
-  padding: 0;
-  padding-bottom: 80px; /* Space for bottom nav */
-  
+/* --- COACH LAYOUT ENGINE --- */
+/* 1. The Container */
+.coach-view-container {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
   background: #1a1d23;
   display: flex;
   flex-direction: column;
-  position: relative;
 }
 
-/* --- PAGES (Home, Log, etc) --- */
-.app-container > div:not(.bottom-nav) {
-  flex: 1;
+/* 2. The Header (Fixed Height) */
+.coach-header-fixed {
+  height: 100px; /* Rigid Height */
+  background: #2d3748;
+  padding: 15px;
+  z-index: 50;
   display: flex;
   flex-direction: column;
-  width: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
+  justify-content: center;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  flex-shrink: 0; /* Never shrink */
+}
+
+/* 3. The Content (Fills the rest) */
+.coach-content-scroll {
+  flex: 1; /* Take all remaining space */
+  position: relative;
+  overflow-y: auto; /* Allow scrolling inside */
+  background: #1a1d23;
+  padding: 0;
+  margin: 0;
+  /* iOS Smooth Scroll */
   -webkit-overflow-scrolling: touch;
 }
 
-/* --- STICKY HEADER --- */
-.top-header {
-  background: #2d3748;
-  color: white;
-  padding: 20px;
-  border-bottom: 1px solid #334155;
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  width: 100%;
-}
-.top-header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; }
-.top-header p { margin: 5px 0 0; font-size: 0.9rem; color: #94a3b8; }
-
-/* --- BOTTOM NAV --- */
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%; /* Full width */
-  background: #2d3748;
-  display: flex;
-  justify-content: space-around;
-  padding: 12px 0;
-  border-top: 1px solid #334155;
-  z-index: 100;
-}
-.nav-item {
-  display: flex; flex-direction: column; align-items: center;
-  font-size: 0.75rem; color: #94a3b8; cursor: pointer; background: none; border: none;
-}
-.nav-item.active { color: #5daca5; }
-
-/* --- CARDS & WIDGETS --- */
-.welcome-card { padding: 20px; width: 100%; }
-.stat-card {
-  background: #2d3748; padding: 15px; border-radius: 12px;
-  border: 1px solid #334155; display: flex; align-items: center; gap: 10px;
-  margin-top: 15px; width: 100%;
-}
-.mission-card {
-  background: linear-gradient(145deg, #2d3748, #1a202c);
-  margin: 20px; padding: 20px; border-radius: 16px;
-  border: 1px solid #334155; text-align: center;
+/* --- WIDGET STYLES --- */
+.coach-select {
+  width: 100%; padding: 10px; background: #1a1d23; color: white;
+  border: 1px solid #4a5568; border-radius: 8px; font-size: 1rem; margin-top: 5px;
 }
 .mission-btn {
-  background: #5daca5; color: white; border: none; padding: 12px 20px;
-  border-radius: 8px; font-weight: bold; margin-top: 15px; width: 100%;
+  background: #5daca5; color: white; border: none; padding: 12px;
+  border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer;
 }
-.workout-card, .meal-section {
-  background: #252a33; margin: 15px 20px; padding: 15px;
-  border-radius: 12px; border: 1px solid #334155;
-}
-.workout-input {
-  width: 100%; background: #1a1d23; border: 1px solid #4a5568;
-  color: white; padding: 10px; border-radius: 8px; margin-top: 10px;
-}
-
-/* --- LOGGING ITEMS --- */
-.meal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.add-btn-small {
-  background: #5daca5; border: none; color: white; width: 28px; height: 28px;
-  border-radius: 50%; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
-}
-.log-item {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 0; border-bottom: 1px solid #334155;
-}
-.log-item:last-child { border-bottom: none; }
-.icon-btn { background: none; border: none; opacity: 0.7; padding: 5px; font-size: 1rem; }
-
-/* --- COACH --- */
-.coach-container {
-  width: 100%; height: 100%; padding: 20px; display: flex; gap: 20px;
-}
-.client-list {
-  width: 300px; background: #252a33; border-radius: 12px; border: 1px solid #334155; display: flex; flex-direction: column;
-}
-.client-item { padding: 15px; border-bottom: 1px solid #334155; color: #94a3b8; }
-.detail-view { flex: 1; background: #252a33; border-radius: 12px; padding: 20px; border: 1px solid #334155; overflow-y: auto; display: flex; flex-direction: column; }
-
-/* --- CHAT --- */
 .chat-window {
-  flex: 1; display: flex; flex-direction: column;
-  border: 1px solid #334155; border-radius: 8px; margin-top: 20px;
-  background: #1a1d23; overflow: hidden;
+  display: flex; flex-direction: column; height: 500px; /* Fixed height for chat on mobile */
+  border: 1px solid #334155; background: #1a1d23; border-radius: 8px;
 }
-.messages-area { flex: 1; padding: 15px; overflow-y: auto; width: 100%; }
-.msg-row { display: flex; align-items: center; margin-bottom: 10px; width: 100%; }
-.msg-row.mine { justify-content: flex-end; }
-.msg-row.theirs { justify-content: flex-start; }
-.message-bubble {
-  max-width: 70%; padding: 10px 14px; border-radius: 14px; font-size: 0.9rem;
-}
-.msg-mine { background: #5daca5; color: white; }
-.msg-theirs { background: #2d3748; color: white; }
-.chat-input-area { display: flex; padding: 10px; background: #2d3748; border-top: 1px solid #334155; width: 100%; }
-.chat-input {
-  flex: 1; padding: 10px; border: 1px solid #4a5568; border-radius: 20px;
-  margin-right: 10px; background: #1a1d23; color: white;
-}
-.delete-btn-outside { background: none; border: none; font-size: 0.9rem; opacity: 0.4; margin-right: 8px; padding: 5px; }
+/* Re-add Log Styles */
+.log-item { padding: 10px; border-bottom: 1px solid #334155; }
+.log-item:last-child { border-bottom: none; }
+h1 { margin: 0; font-size: 1.2rem; }
 
-/* --- COACH DROPDOWN --- */
-.coach-select {
-  width: 100%;
-  padding: 12px;
-  background: #1a1d23;
-  color: white;
-  border: 1px solid #4a5568;
-  border-radius: 8px;
-  margin-top: 10px;
-  font-size: 1rem;
-  outline: none;
-}
-
-/* --- COACH LAYOUT FIX --- */
-.coach-content-wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start !important; /* Force content to top */
-  overflow: hidden;
-  width: 100%;
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-}
+/* --- CLIENT APP STYLES (Keep simple for now) --- */
+.client-layout { padding: 20px; overflow-y: auto; height: 100%; padding-bottom: 80px; }
+.bottom-nav { position: fixed; bottom: 0; width: 100%; height: 60px; background: #2d3748; display: flex; justify-content: space-around; align-items: center; border-top: 1px solid #334155; }
+.nav-item { background: none; border: none; color: #94a3b8; font-size: 1.5rem; }
+.nav-item.active { color: #5daca5; }
