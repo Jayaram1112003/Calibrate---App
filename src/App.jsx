@@ -330,6 +330,7 @@ function ClientProfile({ user, phaseInfo }) {
 
 // --- COACH APP ---
 // --- COACH APP (Mobile Friendly Version) ---
+// --- COACH APP (Fixed Layout) ---
 function CoachApp({ user }) {
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -353,7 +354,6 @@ function CoachApp({ user }) {
     <div className="app-container animate-page">
       <div className="top-header" style={{zIndex:100}}>
         <h1>Coach Dashboard</h1>
-        {/* NEW: Dropdown Menu */}
         <select className="coach-select" onChange={handleSelect} value={selectedClient?.email || ""}>
           <option value="">-- Select a Client --</option>
           {clients.map(c => (
@@ -364,13 +364,14 @@ function CoachApp({ user }) {
         </select>
       </div>
 
-      <div style={{flex:1, overflow:'hidden', display:'flex', flexDirection:'column'}}>
+      {/* FIXED: Added justifyContent: 'flex-start' to remove the gap */}
+      <div style={{flex:1, overflow:'hidden', display:'flex', flexDirection:'column', justifyContent:'flex-start'}}>
         {selectedClient ? (
           <CoachClientDetail client={selectedClient} coachEmail={user.email} />
         ) : (
           <div style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', color:'#64748b', padding:'20px', textAlign:'center'}}>
             <div style={{fontSize:'3rem', marginBottom:'20px'}}>📋</div>
-            <p>Select a client from the menu above to view their logs, chat, and promote them.</p>
+            <p>Select a client from the menu above.</p>
             <button onClick={() => signOut(auth)} style={{marginTop:'30px', border:'none', background:'none', color:'#ef4444', cursor:'pointer', fontSize:'1rem'}}>Logout</button>
           </div>
         )}
@@ -383,7 +384,7 @@ function CoachClientDetail({ client, coachEmail }) {
   const [logs, setLogs] = useState([]);
   const [workout, setWorkout] = useState("No workout logged");
   const [phaseId, setPhaseId] = useState(client.currentPhase || 1);
-  const [activeTab, setActiveTab] = useState('logs'); // 'logs' or 'chat'
+  const [activeTab, setActiveTab] = useState('logs'); 
 
   useEffect(() => {
     // 1. Fetch Logs
@@ -402,16 +403,12 @@ function CoachClientDetail({ client, coachEmail }) {
       else setWorkout("No workout logged today");
     });
 
-    // Reset phase when client changes
     setPhaseId(client.currentPhase || 1);
-
     return () => { unsub(); unsubW(); };
   }, [client]);
 
   const changePhase = async (direction) => {
     let nextPhase = parseInt(phaseId) + direction;
-    
-    // Safety Checks
     if(nextPhase > 6) return alert("Max phase reached");
     if(nextPhase < 1) return alert("Already at Phase 1");
 
@@ -420,10 +417,10 @@ function CoachClientDetail({ client, coachEmail }) {
 
     await updateDoc(doc(db, "users", client.email), {
       currentPhase: nextPhase,
-      celebratePromotion: direction === 1 // Only celebrate promotions
+      celebratePromotion: direction === 1 
     });
     setPhaseId(nextPhase);
-    alert(`Client ${action}d successfully!`);
+    alert(`Client ${action}d!`);
   };
 
   const downloadLogs = () => {
@@ -435,16 +432,15 @@ function CoachClientDetail({ client, coachEmail }) {
   };
 
   return (
-    <div style={{height:'100%', display:'flex', flexDirection:'column', background:'#1a1d23'}}>
+    /* FIXED: Added justifyContent: 'flex-start' here too */
+    <div style={{height:'100%', display:'flex', flexDirection:'column', background:'#1a1d23', justifyContent:'flex-start'}}>
       
-      {/* Client Info Card */}
       <div style={{padding:'15px', background:'#252a33', borderBottom:'1px solid #334155'}}>
         <div style={{fontSize:'0.9rem', color:'#94a3b8', marginBottom:'5px'}}>CURRENTLY AT</div>
         <div style={{fontSize:'1.1rem', fontWeight:'bold', color:'white', marginBottom:'15px'}}>
           {PHASES[phaseId].name}
         </div>
         
-        {/* ACTION BUTTONS */}
         <div style={{display:'flex', gap:'10px', flexWrap:'wrap'}}>
            <button onClick={() => changePhase(1)} className="mission-btn" style={{flex:1, margin:0, background:'#eab308', fontSize:'0.9rem'}}>Promote ⬆</button>
            <button onClick={() => changePhase(-1)} className="mission-btn" style={{flex:1, margin:0, background:'#ef4444', fontSize:'0.9rem'}}>Demote ⬇</button>
@@ -452,33 +448,18 @@ function CoachClientDetail({ client, coachEmail }) {
         </div>
       </div>
 
-      {/* Mobile Tabs for Coach */}
       <div style={{display:'flex', borderBottom:'1px solid #334155'}}>
-        <button 
-          onClick={() => setActiveTab('logs')}
-          style={{flex:1, padding:'15px', background: activeTab==='logs' ? '#2d3748' : 'transparent', color: activeTab==='logs'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold', cursor:'pointer'}}
-        >
-          Food & Workout
-        </button>
-        <button 
-          onClick={() => setActiveTab('chat')}
-          style={{flex:1, padding:'15px', background: activeTab==='chat' ? '#2d3748' : 'transparent', color: activeTab==='chat'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold', cursor:'pointer'}}
-        >
-          Chat
-        </button>
+        <button onClick={() => setActiveTab('logs')} style={{flex:1, padding:'15px', background: activeTab==='logs' ? '#2d3748' : 'transparent', color: activeTab==='logs'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold', cursor:'pointer'}}>Food & Workout</button>
+        <button onClick={() => setActiveTab('chat')} style={{flex:1, padding:'15px', background: activeTab==='chat' ? '#2d3748' : 'transparent', color: activeTab==='chat'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold', cursor:'pointer'}}>Chat</button>
       </div>
 
-      {/* TAB CONTENT */}
       <div style={{flex:1, overflow:'hidden', position:'relative'}}>
-        
-        {/* VIEW 1: LOGS & WORKOUT */}
         {activeTab === 'logs' && (
           <div style={{height:'100%', overflowY:'auto', padding:'15px'}}>
              <div style={{background:'#2d3748', padding:'15px', borderRadius:'8px', marginBottom:'20px', border:'1px solid #334155'}}>
                 <div style={{fontSize:'0.8rem', color:'#94a3b8', marginBottom:'5px'}}>TODAY'S WORKOUT</div>
                 <div style={{color:'white', whiteSpace:'pre-wrap'}}>{workout}</div>
              </div>
-
              <h3 style={{color:'#94a3b8', borderBottom:'1px solid #334155', paddingBottom:'10px', marginTop:0}}>History</h3>
              {logs.map(log => (
                 <div key={log.id} style={{padding:'10px', borderBottom:'1px solid #2d3748'}}>
@@ -489,12 +470,9 @@ function CoachClientDetail({ client, coachEmail }) {
              ))}
           </div>
         )}
-
-        {/* VIEW 2: CHAT */}
         {activeTab === 'chat' && (
            <ChatInterface currentUserEmail={coachEmail} chatPath={`users/${client.email}/messages`} />
         )}
-
       </div>
     </div>
   );
