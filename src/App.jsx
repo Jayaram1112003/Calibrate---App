@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged 
-} from 'firebase/auth';
-import { 
-  getFirestore, doc, getDoc, collection, addDoc, query, where, getDocs, 
-  onSnapshot, serverTimestamp, deleteDoc, updateDoc, setDoc 
-} from 'firebase/firestore';
-import confetti from 'canvas-confetti'; // Requires: npm install canvas-confetti
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, getDoc, collection, addDoc, query, where, getDocs, onSnapshot, serverTimestamp, deleteDoc, updateDoc } from 'firebase/firestore';
+import confetti from 'canvas-confetti';
 import './App.css';
 
 // --- CONFIGURATION ---
+// !!! PASTE YOUR FIREBASE KEYS HERE !!!
 const firebaseConfig = {
   apiKey: "AIzaSyBcMz0Y1ivVDLVrZ4CrL28LkiDThmsnBXE",
   authDomain: "calibrate-diet-app.firebaseapp.com",
@@ -24,7 +20,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- PHASES DATA ---
 const PHASES = {
   1: { name: "Phase 1: The Audit", days: "7-10 days" },
   2: { name: "Phase 2: The Subtraction", days: "10 days" },
@@ -36,7 +31,7 @@ const PHASES = {
 
 export default function App() {
   const [user, setUser] = useState(null);
-  const [userData, setUserData] = useState(null); // stores db role, phase, etc.
+  const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,16 +39,12 @@ export default function App() {
       if (currentUser) {
         const userRef = doc(db, "users", currentUser.email);
         const userSnap = await getDoc(userRef);
-        
         if (userSnap.exists()) {
           const data = userSnap.data();
           setUserData(data);
           setUser(currentUser);
-          
-          // CHECK FOR PROMOTION CELEBRATION
           if (data.celebratePromotion) {
             triggerCelebration();
-            // Turn off the flag so it doesn't celebrate every time
             await updateDoc(userRef, { celebratePromotion: false });
           }
         } else {
@@ -70,37 +61,26 @@ export default function App() {
   }, []);
 
   const triggerCelebration = () => {
-    var duration = 3 * 1000;
-    var animationEnd = Date.now() + duration;
-    var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 999 };
-
-    var interval = setInterval(function() {
-      var timeLeft = animationEnd - Date.now();
-      if (timeLeft <= 0) return clearInterval(interval);
-      var particleCount = 50 * (timeLeft / duration);
-      confetti({ ...defaults, particleCount, origin: { x: Math.random(), y: Math.random() - 0.2 } });
-    }, 250);
+    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
   };
 
-  if (loading) return <div style={{padding:'20px', color:'white'}}>Loading Calibrate...</div>;
+  if (loading) return <div style={{padding:'20px', color:'white'}}>Loading...</div>;
   if (!user) return <LoginPage />;
   if (userData?.role === 'unauthorized') return <UnauthorizedPage email={user.email} />;
   
+  // ROUTING
   if (userData?.role === 'client') return <ClientApp user={user} userData={userData} />;
   if (userData?.role === 'coach' || userData?.role === 'owner') return <CoachApp user={user} />;
   return null;
 }
 
-// --- PAGES ---
-
+// --- SHARED LOGIN PAGES ---
 function LoginPage() {
-  const login = () => signInWithPopup(auth, new GoogleAuthProvider());
   return (
-    <div className="app-container" style={{display:'flex', alignItems:'center', justifyContent:'center'}}>
-      <div style={{textAlign:'center', padding:'20px'}} className="animate-page">
+    <div style={{display:'flex', height:'100vh', alignItems:'center', justifyContent:'center', background:'#1a1d23'}}>
+      <div style={{textAlign:'center'}}>
         <h1 style={{color:'white'}}>Calibrate</h1>
-        <p style={{color:'#94a3b8'}}>Diet Coaching App</p>
-        <button className="mission-btn" onClick={login}>Sign in with Google</button>
+        <button className="mission-btn" onClick={() => signInWithPopup(auth, new GoogleAuthProvider())}>Sign in with Google</button>
       </div>
     </div>
   );
@@ -108,28 +88,33 @@ function LoginPage() {
 
 function UnauthorizedPage({ email }) {
   return (
-    <div className="app-container" style={{padding:'40px', textAlign:'center'}}>
-      <h2>Access Restricted</h2>
-      <p>The email {email} is not in our system.</p>
-      <button className="mission-btn" onClick={() => signOut(auth)}>Logout</button>
+    <div style={{padding:'40px', textAlign:'center', color:'white'}}>
+      <h2>Access Denied</h2>
+      <p>{email} is not registered.</p>
+      <button className="mission-btn" onClick={() => signOut(auth)} style={{background:'#ef4444'}}>Logout</button>
     </div>
   );
 }
 
-// --- CLIENT APP ---
+// ==========================================
+// CLIENT APP (Revised Layout)
+// ==========================================
 function ClientApp({ user, userData }) {
   const [tab, setTab] = useState('home'); 
-  // Current Phase Info (Default to 1 if missing)
   const currentPhaseId = userData.currentPhase || 1;
   const phaseInfo = PHASES[currentPhaseId] || PHASES[1];
 
   return (
-    <div className="app-container">
-      {tab === 'home' && <ClientHome user={user} phaseInfo={phaseInfo} setTab={setTab} />}
-      {tab === 'log' && <ClientLog user={user} />}
-      {tab === 'coach' && <ClientChat user={user} />}
-      {tab === 'profile' && <ClientProfile user={user} phaseInfo={phaseInfo} />}
+    <div className="client-container">
+      {/* Scrollable Content Area */}
+      <div className="client-content">
+        {tab === 'home' && <ClientHome user={user} phaseInfo={phaseInfo} setTab={setTab} />}
+        {tab === 'log' && <ClientLog user={user} />}
+        {tab === 'coach' && <ClientChat user={user} />}
+        {tab === 'profile' && <ClientProfile user={user} phaseInfo={phaseInfo} />}
+      </div>
       
+      {/* Fixed Bottom Nav */}
       <div className="bottom-nav">
         <NavBtn label="Home" active={tab === 'home'} onClick={() => setTab('home')}>🏠</NavBtn>
         <NavBtn label="Log" active={tab === 'log'} onClick={() => setTab('log')}>📝</NavBtn>
@@ -143,49 +128,34 @@ function ClientApp({ user, userData }) {
 function NavBtn({ label, active, onClick, children }) {
   return (
     <button className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}>
-      <span style={{fontSize:'1.5rem', marginBottom:'2px'}}>{children}</span>
+      <span style={{fontSize:'1.4rem'}}>{children}</span>
       <span>{label}</span>
     </button>
   );
 }
 
 function ClientHome({ user, phaseInfo, setTab }) {
-  const [greeting, setGreeting] = useState("Good Morning!");
-
-  useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour >= 4 && hour < 12) setGreeting("Good Morning!");
-    else if (hour >= 12 && hour < 17) setGreeting("Good Afternoon!");
-    else if (hour >= 17 && hour < 23) setGreeting("Good Evening!");
-    else setGreeting("Go to sleep, Improve your health :)");
-  }, []);
-
   return (
-    <div className="animate-page">
-      <div className="top-header">
+    <div>
+      <div className="client-header">
         <h1>Calibrate</h1>
         <p>{phaseInfo.name}</p>
       </div>
       
       <div className="welcome-card">
-        <h2>{greeting}</h2>
-        <p style={{color:'#94a3b8'}}>Ready to crush your goals today?</p>
-        
-        <div className="stat-card" style={{justifyContent:'center', textAlign:'center'}}>
-           <span style={{fontSize:'1.5rem'}}>🍴</span>
-           <div>
-             <div style={{fontSize:'0.7rem', color:'#94a3b8'}}>TODAY'S LOGS</div>
-             <div style={{fontWeight:'bold'}}>Check Log Tab</div>
-           </div>
+        <h2>Good Morning!</h2>
+        <p>Ready to crush your goals?</p>
+        <div style={{marginTop:'15px', padding:'15px', background:'#2d3748', borderRadius:'8px', textAlign:'center', border:'1px solid #334155'}}>
+           <div style={{fontSize:'1.5rem'}}>🍴</div>
+           <div style={{fontSize:'0.8rem', color:'#94a3b8'}}>MEALS</div>
+           <div style={{fontWeight:'bold'}}>Check Log Tab</div>
         </div>
       </div>
 
       <div className="mission-card">
-        <div style={{fontSize:'0.8rem', opacity:0.8, marginBottom:'5px'}}>CURRENT MISSION</div>
-        <h3 style={{margin:'0 0 10px 0'}}>{phaseInfo.name}</h3>
-        <p style={{fontSize:'0.9rem', lineHeight:'1.4', color:'#cbd5e1'}}>
-          Focus for the next {phaseInfo.days}. Stick to the plan.
-        </p>
+        <div style={{fontSize:'0.8rem', opacity:0.8}}>CURRENT MISSION</div>
+        <h3>{phaseInfo.name}</h3>
+        <p>Stick to the plan.</p>
         <button className="mission-btn" onClick={() => setTab('log')}>+ Log Meal</button>
       </div>
     </div>
@@ -195,116 +165,58 @@ function ClientHome({ user, phaseInfo, setTab }) {
 function ClientLog({ user }) {
   const [logs, setLogs] = useState([]);
   const [workout, setWorkout] = useState("");
-  const [workoutId, setWorkoutId] = useState(null);
-  
   const todayDate = new Date().toLocaleDateString();
 
   useEffect(() => {
-    // Fetch Food Logs
     const q = query(collection(db, "food_logs"), where("user_email", "==", user.email), where("date_string", "==", todayDate));
     const unsub = onSnapshot(q, (snapshot) => {
       setLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-
-    // Fetch Workout Log
-    const wQ = query(collection(db, "workouts"), where("user_email", "==", user.email), where("date_string", "==", todayDate));
-    const unsubW = onSnapshot(wQ, (snapshot) => {
-      if(!snapshot.empty) {
-        setWorkout(snapshot.docs[0].data().text);
-        setWorkoutId(snapshot.docs[0].id);
-      }
-    });
-
-    return () => { unsub(); unsubW(); };
-  }, [user.email, todayDate]);
-
-  const saveWorkout = async () => {
-    if(!workoutId) {
-      await addDoc(collection(db, "workouts"), {
-        user_email: user.email, text: workout, date_string: todayDate, timestamp: serverTimestamp()
-      });
-    } else {
-      await updateDoc(doc(db, "workouts", workoutId), { text: workout });
-    }
-    alert("Workout Saved!");
-  };
+    return () => unsub();
+  }, [user.email]);
 
   const addLog = async (mealType) => {
-    const item = prompt(`What did you eat for ${mealType}?`);
-    if (!item) return;
-    const qty = prompt("How much? (e.g. 1 bowl)");
-    if (!qty) return;
-    await addDoc(collection(db, "food_logs"), {
-      user_email: user.email, meal: mealType, item, quantity: qty, date_string: todayDate, timestamp: serverTimestamp()
-    });
+    const item = prompt(`What did you eat?`); if (!item) return;
+    const qty = prompt("Quantity?"); if (!qty) return;
+    await addDoc(collection(db, "food_logs"), { user_email: user.email, meal: mealType, item, quantity: qty, date_string: todayDate, timestamp: serverTimestamp() });
   };
 
-  const deleteLog = async (id) => {
-    if(window.confirm("Delete this item?")) await deleteDoc(doc(db, "food_logs", id));
-  };
-  
-  const editLog = async (log) => {
-    const newItem = prompt("Update Item Name:", log.item); if (!newItem) return;
-    const newQty = prompt("Update Quantity:", log.quantity); if (!newQty) return;
-    await updateDoc(doc(db, "food_logs", log.id), { item: newItem, quantity: newQty });
-  };
+  const deleteLog = async (id) => { if(confirm("Delete?")) await deleteDoc(doc(db, "food_logs", id)); };
 
   return (
-    <div className="animate-page">
-      <div className="top-header">
-        <h1>Today's Log</h1>
-        <p>{todayDate}</p>
-      </div>
-
+    <div>
+      <div className="client-header"><h1>Today's Log</h1><p>{todayDate}</p></div>
+      
       <div className="workout-card">
-        <div style={{fontWeight:'bold'}}>💪 Today's Workout</div>
-        <textarea 
-          className="workout-input" 
-          rows="3"
-          placeholder="What training did you do today?"
-          value={workout}
-          onChange={(e) => setWorkout(e.target.value)}
-          onBlur={saveWorkout} // Saves when they click away
-        />
+        <div style={{fontWeight:'bold', marginBottom:'10px'}}>💪 Today's Workout</div>
+        <textarea style={{width:'100%', background:'#1a1d23', color:'white', padding:'10px', borderRadius:'8px', border:'1px solid #4a5568'}} 
+          placeholder="Log training..." value={workout} onChange={e=>setWorkout(e.target.value)} />
       </div>
 
-      <div style={{paddingBottom:'20px'}}>
-        {["Breakfast", "Morning Snack", "Lunch", "Evening Snack", "Dinner"].map(meal => {
-          const loggedItems = logs.filter(l => l.meal === meal);
-          return (
-            <div key={meal} className="meal-section">
-              <div className="meal-header">
-                <div className="meal-title">{meal.includes("Snack") ? "☕" : "🍽️"} {meal}</div>
-                <button className="add-btn-small" onClick={() => addLog(meal)}>+</button>
-              </div>
-              <div>
-                {loggedItems.length === 0 ? <div style={{fontStyle:'italic', color:'#64748b', fontSize:'0.9rem'}}>No items</div> : 
-                  loggedItems.map(log => (
-                    <div key={log.id} className="log-item">
-                      <div><div style={{fontWeight:'500'}}>{log.item}</div><div style={{fontSize:'0.85rem', color:'#94a3b8'}}>{log.quantity}</div></div>
-                      <div style={{display:'flex', gap:'10px'}}>
-                        <button className="icon-btn" onClick={() => editLog(log)}>✏️</button>
-                        <button className="icon-btn" style={{color:'#ef4444'}} onClick={() => deleteLog(log.id)}>🗑️</button>
-                      </div>
-                    </div>
-                  ))
-                }
-              </div>
+      {["Breakfast", "Morning Snack", "Lunch", "Evening Snack", "Dinner"].map(meal => (
+        <div key={meal} className="meal-section">
+          <div className="meal-header">
+            <div style={{fontWeight:'bold'}}>{meal}</div>
+            <button className="add-btn-small" onClick={() => addLog(meal)}>+</button>
+          </div>
+          {logs.filter(l => l.meal === meal).map(log => (
+            <div key={log.id} className="log-item">
+              <div><div>{log.item}</div><div style={{fontSize:'0.8rem', color:'#94a3b8'}}>{log.quantity}</div></div>
+              <button className="icon-btn" onClick={() => deleteLog(log.id)} style={{color:'#ef4444'}}>🗑️</button>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
 
 function ClientChat({ user }) {
-  const chatPath = `users/${user.email}/messages`;
   return (
-    <div style={{height:'100%', display:'flex', flexDirection:'column'}} className="animate-page">
-      <div className="top-header"><h1>Coach Chat</h1></div>
-      <div style={{padding:'20px', flex:1, display:'flex', flexDirection:'column'}}>
-        <ChatInterface currentUserEmail={user.email} chatPath={chatPath} />
+    <div style={{height:'100%', display:'flex', flexDirection:'column'}}>
+      <div className="client-header"><h1>Coach Chat</h1></div>
+      <div style={{flex:1, padding:'15px', display:'flex', flexDirection:'column'}}>
+         <ChatInterface currentUserEmail={user.email} chatPath={`users/${user.email}/messages`} />
       </div>
     </div>
   );
@@ -312,132 +224,92 @@ function ClientChat({ user }) {
 
 function ClientProfile({ user, phaseInfo }) {
   return (
-    <div className="animate-page">
-      <div className="top-header"><h1>Profile</h1></div>
-      <div style={{padding:'20px', textAlign:'center'}}>
-        <div style={{width:'80px', height:'80px', background:'#2d3748', borderRadius:'50%', margin:'0 auto 15px auto', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'2rem'}}>👤</div>
+    <div>
+      <div className="client-header"><h1>Profile</h1></div>
+      <div style={{padding:'30px', textAlign:'center'}}>
+        <div style={{fontSize:'3rem', marginBottom:'10px'}}>👤</div>
         <h2>{user.displayName}</h2>
-        <p style={{color:'#94a3b8'}}>{user.email}</p>
-        <div style={{margin:'20px 0', padding:'10px', background:'#2d3748', borderRadius:'8px'}}>
+        <div style={{background:'#2d3748', padding:'15px', borderRadius:'8px', margin:'20px 0'}}>
           <div style={{fontSize:'0.8rem', color:'#94a3b8'}}>CURRENT PHASE</div>
-          <div style={{fontWeight:'bold', color:'#5daca5'}}>{phaseInfo.name}</div>
+          <div style={{color:'#5daca5', fontWeight:'bold'}}>{phaseInfo.name}</div>
         </div>
-        <button onClick={() => signOut(auth)} style={{marginTop:'30px', background:'transparent', border:'1px solid #ef4444', color:'#ef4444', padding:'10px 30px', borderRadius:'20px', cursor:'pointer'}}>Sign Out</button>
+        <button className="mission-btn" style={{background:'transparent', border:'1px solid #ef4444', color:'#ef4444'}} onClick={() => signOut(auth)}>Sign Out</button>
       </div>
     </div>
   );
 }
 
-// --- COACH APP ---
-// --- COACH APP (Mobile Friendly Version) ---
-// --- COACH APP (Fixed Layout) ---
-// --- COACH APP (Gap Fixed) ---
-// --- COACH APP (Gap Destroyed) ---
-// --- COACH APP (Gap Fixed v2) ---
-// --- COACH APP (Absolute Layout) ---
+// ==========================================
+// COACH APP (Revised Layout)
+// ==========================================
 function CoachApp({ user }) {
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
 
   useEffect(() => {
-    const fetchClients = async () => {
-      const q = query(collection(db, "users"), where("role", "==", "client"));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setClients(snapshot.docs.map(doc => ({ email: doc.id, ...doc.data() })));
-      });
-      return () => unsubscribe();
-    };
-    fetchClients();
+    const q = query(collection(db, "users"), where("role", "==", "client"));
+    const unsub = onSnapshot(q, (snap) => setClients(snap.docs.map(d => ({ email: d.id, ...d.data() }))));
+    return () => unsub();
   }, []);
 
   const handleSelect = (e) => {
-    const email = e.target.value;
-    if (!email) setSelectedClient(null);
-    else setSelectedClient(clients.find(c => c.email === email));
+    const client = clients.find(c => c.email === e.target.value);
+    setSelectedClient(client || null);
   };
 
   return (
-    <div className="coach-view-container">
-      {/* 1. FIXED HEADER */}
-      <div className="coach-header-fixed">
-        <h1>Coach Dashboard</h1>
-        <select className="coach-select" onChange={handleSelect} value={selectedClient?.email || ""}>
-          <option value="">-- Select a Client --</option>
-          {clients.map(c => (
-            <option key={c.email} value={c.email}>
-              {c.email} ({PHASES[c.currentPhase || 1].name})
-            </option>
-          ))}
+    <div className="coach-container">
+      {/* HEADER WITH LOGOUT */}
+      <div className="coach-header">
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <h1>Coach Dashboard</h1>
+          <button onClick={() => signOut(auth)} style={{background:'none', border:'none', fontSize:'1.5rem', cursor:'pointer'}}>🚪</button>
+        </div>
+        <select style={{width:'100%', padding:'10px', marginTop:'10px', background:'#1a1d23', color:'white', border:'1px solid #4a5568', borderRadius:'5px'}} 
+          onChange={handleSelect} value={selectedClient?.email || ""}>
+          <option value="">-- Select Client --</option>
+          {clients.map(c => <option key={c.email} value={c.email}>{c.email}</option>)}
         </select>
       </div>
 
-      {/* 2. SCROLLABLE BODY (Starts exactly after header) */}
-      <div className="coach-content-scroll">
-        {selectedClient ? (
-          <CoachClientDetail client={selectedClient} coachEmail={user.email} />
-        ) : (
-          <div style={{padding:'40px', textAlign:'center', color:'#64748b'}}>
-            <div style={{fontSize:'3rem'}}>👆</div>
-            <p>Select a client above</p>
-            <button onClick={() => signOut(auth)} style={{marginTop:'20px', color:'#ef4444', background:'none', border:'none'}}>Logout</button>
-          </div>
-        )}
+      {/* BODY */}
+      <div className="coach-scroll-area">
+        {selectedClient ? <CoachClientDetail client={selectedClient} coachEmail={user.email} /> : 
+          <div style={{padding:'50px', textAlign:'center', color:'#64748b'}}>Select a client to begin</div>
+        }
       </div>
     </div>
   );
 }
 
 function CoachClientDetail({ client, coachEmail }) {
-  const [logs, setLogs] = useState([]);
-  const [workout, setWorkout] = useState("No workout");
   const [activeTab, setActiveTab] = useState('logs');
-  const [phaseId, setPhaseId] = useState(client.currentPhase || 1);
-
+  const [logs, setLogs] = useState([]);
+  
   useEffect(() => {
     const q = query(collection(db, "food_logs"), where("user_email", "==", client.email));
     const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(d => ({id: d.id, ...d.data()}));
-      data.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
-      setLogs(data);
+      const d = snap.docs.map(doc => ({id:doc.id, ...doc.data()}));
+      d.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
+      setLogs(d);
     });
-    
-    const today = new Date().toLocaleDateString();
-    const wQ = query(collection(db, "workouts"), where("user_email", "==", client.email), where("date_string", "==", today));
-    const unsubW = onSnapshot(wQ, (snap) => {
-      if(!snap.empty) setWorkout(snap.docs[0].data().text);
-      else setWorkout("No workout today");
-    });
-    
-    setPhaseId(client.currentPhase || 1);
-    return () => { unsub(); unsubW(); };
+    return () => unsub();
   }, [client]);
 
-  const changePhase = async (direction) => {
-    let nextPhase = parseInt(phaseId) + direction;
-    if(nextPhase > 6 || nextPhase < 1) return;
-    if(!window.confirm("Change Phase?")) return;
-    await updateDoc(doc(db, "users", client.email), { currentPhase: nextPhase, celebratePromotion: direction === 1 });
-  };
-
-  const downloadLogs = () => {
-    const text = logs.map(l => `${l.date_string} | ${l.meal} | ${l.item} | ${l.quantity}`).join("\n");
-    const blob = new Blob([text], {type:'text/plain'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'logs.txt'; a.click();
+  const changePhase = async (dir) => {
+    const next = (client.currentPhase || 1) + dir;
+    if(next < 1 || next > 6) return;
+    if(confirm(`Move to Phase ${next}?`)) await updateDoc(doc(db, "users", client.email), { currentPhase: next, celebratePromotion: dir===1 });
   };
 
   return (
-    <div style={{minHeight:'100%'}}> {/* Ensures content fills scroll area */}
-      
+    <div style={{minHeight:'100%', display:'flex', flexDirection:'column'}}>
       {/* INFO CARD */}
-      <div style={{background:'#252a33', padding:'15px', borderBottom:'1px solid #334155'}}>
-        <div style={{color:'#94a3b8', fontSize:'0.8rem'}}>CURRENT PHASE</div>
-        <div style={{fontWeight:'bold', fontSize:'1.1rem', marginBottom:'10px'}}>{PHASES[phaseId]?.name}</div>
-        <div style={{display:'flex', gap:'5px'}}>
-          <button onClick={() => changePhase(1)} className="mission-btn" style={{background:'#eab308', padding:'8px'}}>⬆</button>
-          <button onClick={() => changePhase(-1)} className="mission-btn" style={{background:'#ef4444', padding:'8px'}}>⬇</button>
-          <button onClick={downloadLogs} className="mission-btn" style={{background:'#4a5568', padding:'8px'}}>💾</button>
+      <div style={{padding:'15px', background:'#252a33', borderBottom:'1px solid #334155'}}>
+        <div style={{color:'#94a3b8', fontSize:'0.8rem'}}>PHASE: {PHASES[client.currentPhase||1].name}</div>
+        <div style={{display:'flex', gap:'10px', marginTop:'10px'}}>
+          <button onClick={() => changePhase(1)} className="mission-btn" style={{margin:0, flex:1, background:'#eab308'}}>Promote</button>
+          <button onClick={() => changePhase(-1)} className="mission-btn" style={{margin:0, flex:1, background:'#ef4444'}}>Demote</button>
         </div>
       </div>
 
@@ -448,32 +320,21 @@ function CoachClientDetail({ client, coachEmail }) {
       </div>
 
       {/* CONTENT */}
-      <div style={{padding:'15px'}}>
-        {activeTab === 'logs' && (
-          <>
-            <div style={{background:'#2d3748', padding:'10px', borderRadius:'8px', marginBottom:'20px'}}>
-              <div style={{color:'#94a3b8', fontSize:'0.8rem'}}>TODAY'S WORKOUT</div>
-              <div>{workout}</div>
-            </div>
-            <h3>History</h3>
-            {logs.map(log => (
-              <div key={log.id} className="log-item">
-                <div style={{color:'#94a3b8', fontSize:'0.8rem'}}>{log.date_string} - {log.meal}</div>
-                <div>{log.item} <span style={{color:'#5daca5'}}>({log.quantity})</span></div>
-              </div>
-            ))}
-          </>
-        )}
-        {activeTab === 'chat' && (
-          <div className="chat-window">
-             <ChatInterface currentUserEmail={coachEmail} chatPath={`users/${client.email}/messages`} />
+      <div style={{padding:'15px', flex:1, display:'flex', flexDirection:'column'}}>
+        {activeTab === 'logs' && logs.map(l => (
+          <div key={l.id} className="log-item">
+            <div>{l.item}</div><div style={{color:'#5daca5'}}>{l.quantity}</div>
           </div>
+        ))}
+        {activeTab === 'chat' && (
+           <ChatInterface currentUserEmail={coachEmail} chatPath={`users/${client.email}/messages`} />
         )}
       </div>
     </div>
   );
 }
 
+// --- SHARED CHAT ---
 function ChatInterface({ currentUserEmail, chatPath }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -481,43 +342,40 @@ function ChatInterface({ currentUserEmail, chatPath }) {
 
   useEffect(() => {
     const q = query(collection(db, chatPath));
-    const unsub = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      msgs.sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
-      setMessages(msgs);
-      setTimeout(() => dummyDiv.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    const unsub = onSnapshot(q, (snap) => {
+      const m = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      m.sort((a,b) => (a.timestamp?.seconds||0) - (b.timestamp?.seconds||0));
+      setMessages(m);
+      setTimeout(() => dummyDiv.current?.scrollIntoView({behavior:'smooth'}), 100);
     });
     return () => unsub();
   }, [chatPath]);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const send = async () => {
+    if(!input.trim()) return;
     await addDoc(collection(db, chatPath), { text: input, sender: currentUserEmail, timestamp: serverTimestamp(), isDeleted: false });
     setInput("");
   };
 
-  const deleteMessage = async (msgId) => {
-    if(!window.confirm("Delete?")) return;
-    await updateDoc(doc(db, chatPath, msgId), { text: "🚫 Message deleted", isDeleted: true });
-  };
+  const deleteMsg = async (id) => { if(confirm("Delete?")) await updateDoc(doc(db, chatPath, id), { text: "🚫 Deleted", isDeleted: true }); };
 
   return (
-    <div className="chat-window" style={{height:'100%', marginTop:0, display:'flex', flexDirection:'column'}}>
-      <div className="messages-area" style={{flex:1}}>
+    <div className="chat-window">
+      <div className="messages-area">
         {messages.map(m => {
           const isMine = m.sender === currentUserEmail;
           return (
-            <div key={m.id} className={`msg-row ${isMine ? 'mine' : 'theirs'}`}>
-              {isMine && !m.isDeleted && <button className="delete-btn-outside" onClick={() => deleteMessage(m.id)}>🗑️</button>}
-              <div className={`message-bubble ${isMine ? 'msg-mine' : 'msg-theirs'}`} style={m.isDeleted ? {fontStyle:'italic', opacity:0.6, background:'#333'} : {}}>{m.text}</div>
+            <div key={m.id} className={`msg-row ${isMine?'mine':'theirs'}`}>
+              {isMine && !m.isDeleted && <button className="icon-btn" onClick={() => deleteMsg(m.id)}>🗑️</button>}
+              <div className={`message-bubble ${isMine?'msg-mine':'msg-theirs'}`} style={m.isDeleted?{opacity:0.5}:{}}>{m.text}</div>
             </div>
           );
         })}
         <div ref={dummyDiv}></div>
       </div>
       <div className="chat-input-area">
-        <input className="chat-input" value={input} onChange={e => setInput(e.target.value)} placeholder="Type a message..." onKeyDown={e => e.key === 'Enter' && sendMessage()} />
-        <button onClick={sendMessage} style={{background:'#5daca5', color:'white', border:'none', borderRadius:'50%', width:'40px', height:'40px', cursor:'pointer'}}>➤</button>
+        <input className="chat-input" value={input} onChange={e=>setInput(e.target.value)} placeholder="Type..." onKeyDown={e=>e.key==='Enter'&&send()} />
+        <button onClick={send} style={{background:'#5daca5', border:'none', borderRadius:'50%', width:'35px', height:'35px', color:'white'}}>➤</button>
       </div>
     </div>
   );
