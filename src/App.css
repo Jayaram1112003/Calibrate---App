@@ -156,3 +156,16 @@ html, body {
   margin-right: 10px; background: #1a1d23; color: white;
 }
 .delete-btn-outside { background: none; border: none; font-size: 0.9rem; opacity: 0.4; margin-right: 8px; padding: 5px; }
+
+/* --- COACH DROPDOWN --- */
+.coach-select {
+  width: 100%;
+  padding: 12px;
+  background: #1a1d23;
+  color: white;
+  border: 1px solid #4a5568;
+  border-radius: 8px;
+  margin-top: 10px;
+  font-size: 1rem;
+  outline: none;
+}

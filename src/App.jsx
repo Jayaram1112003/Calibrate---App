@@ -329,6 +329,7 @@ function ClientProfile({ user, phaseInfo }) {
 }
 
 // --- COACH APP ---
+// --- COACH APP (Mobile Friendly Version) ---
 function CoachApp({ user }) {
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -342,20 +343,37 @@ function CoachApp({ user }) {
     fetchClients();
   }, []);
 
+  const handleSelect = (e) => {
+    const email = e.target.value;
+    if (!email) setSelectedClient(null);
+    else setSelectedClient(clients.find(c => c.email === email));
+  };
+
   return (
-    <div className="coach-container animate-page">
-      <div className="client-list">
-        <div style={{padding:'15px', background:'#2d3748', borderBottom:'1px solid #334155', fontWeight:'bold', color:'white'}}>My Clients</div>
-        {clients.map(c => (
-          <div key={c.email} className={`client-item ${selectedClient?.email === c.email ? 'selected' : ''}`} onClick={() => setSelectedClient(c)}>
-            <div style={{fontWeight:'600'}}>{c.email}</div>
-            <div style={{fontSize:'0.8rem', color:'#94a3b8'}}>{PHASES[c.currentPhase || 1].name}</div>
-          </div>
-        ))}
-        <div style={{padding:'15px', marginTop:'auto', borderTop:'1px solid #334155'}}><button onClick={() => signOut(auth)} style={{border:'none', background:'none', color:'#ef4444', cursor:'pointer'}}>Logout</button></div>
+    <div className="app-container animate-page">
+      <div className="top-header" style={{zIndex:100}}>
+        <h1>Coach Dashboard</h1>
+        {/* NEW: Dropdown Menu */}
+        <select className="coach-select" onChange={handleSelect} value={selectedClient?.email || ""}>
+          <option value="">-- Select a Client --</option>
+          {clients.map(c => (
+            <option key={c.email} value={c.email}>
+              {c.email} ({PHASES[c.currentPhase || 1].name})
+            </option>
+          ))}
+        </select>
       </div>
-      <div className="detail-view">
-        {selectedClient ? <CoachClientDetail client={selectedClient} coachEmail={user.email} /> : <div style={{display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'#64748b'}}>Select a client</div>}
+
+      <div style={{flex:1, overflow:'hidden', display:'flex', flexDirection:'column'}}>
+        {selectedClient ? (
+          <CoachClientDetail client={selectedClient} coachEmail={user.email} />
+        ) : (
+          <div style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', color:'#64748b', padding:'20px', textAlign:'center'}}>
+            <div style={{fontSize:'3rem', marginBottom:'20px'}}>📋</div>
+            <p>Select a client from the menu above to view their logs, chat, and promote them.</p>
+            <button onClick={() => signOut(auth)} style={{marginTop:'30px', border:'none', background:'none', color:'#ef4444', cursor:'pointer', fontSize:'1rem'}}>Logout</button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -365,9 +383,10 @@ function CoachClientDetail({ client, coachEmail }) {
   const [logs, setLogs] = useState([]);
   const [workout, setWorkout] = useState("No workout logged");
   const [phaseId, setPhaseId] = useState(client.currentPhase || 1);
+  const [activeTab, setActiveTab] = useState('logs'); // 'logs' or 'chat'
 
   useEffect(() => {
-    // Logs
+    // 1. Fetch Logs
     const q = query(collection(db, "food_logs"), where("user_email", "==", client.email));
     const unsub = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -375,7 +394,7 @@ function CoachClientDetail({ client, coachEmail }) {
       setLogs(data);
     });
     
-    // Workout (Today)
+    // 2. Fetch Today's Workout
     const today = new Date().toLocaleDateString();
     const wQ = query(collection(db, "workouts"), where("user_email", "==", client.email), where("date_string", "==", today));
     const unsubW = onSnapshot(wQ, (snap) => {
@@ -383,20 +402,28 @@ function CoachClientDetail({ client, coachEmail }) {
       else setWorkout("No workout logged today");
     });
 
+    // Reset phase when client changes
+    setPhaseId(client.currentPhase || 1);
+
     return () => { unsub(); unsubW(); };
   }, [client]);
 
-  const promoteClient = async () => {
-    const nextPhase = parseInt(phaseId) + 1;
+  const changePhase = async (direction) => {
+    let nextPhase = parseInt(phaseId) + direction;
+    
+    // Safety Checks
     if(nextPhase > 6) return alert("Max phase reached");
-    if(!window.confirm(`Promote ${client.email} to Phase ${nextPhase}?`)) return;
+    if(nextPhase < 1) return alert("Already at Phase 1");
+
+    const action = direction === 1 ? "Promote" : "Demote";
+    if(!window.confirm(`${action} ${client.email} to Phase ${nextPhase}?`)) return;
 
     await updateDoc(doc(db, "users", client.email), {
       currentPhase: nextPhase,
-      celebratePromotion: true
+      celebratePromotion: direction === 1 // Only celebrate promotions
     });
     setPhaseId(nextPhase);
-    alert("Client Promoted! They will see confetti next login.");
+    alert(`Client ${action}d successfully!`);
   };
 
   const downloadLogs = () => {
@@ -408,40 +435,66 @@ function CoachClientDetail({ client, coachEmail }) {
   };
 
   return (
-    <div style={{height:'100%', display:'flex', flexDirection:'column'}}>
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
-        <div>
-          <h2>{client.email}</h2>
-          <div style={{color:'#5daca5', fontWeight:'bold', marginTop:'5px'}}>
-            Currently: {PHASES[phaseId].name}
+    <div style={{height:'100%', display:'flex', flexDirection:'column', background:'#1a1d23'}}>
+      
+      {/* Client Info Card */}
+      <div style={{padding:'15px', background:'#252a33', borderBottom:'1px solid #334155'}}>
+        <div style={{fontSize:'0.9rem', color:'#94a3b8', marginBottom:'5px'}}>CURRENTLY AT</div>
+        <div style={{fontSize:'1.1rem', fontWeight:'bold', color:'white', marginBottom:'15px'}}>
+          {PHASES[phaseId].name}
+        </div>
+        
+        {/* ACTION BUTTONS */}
+        <div style={{display:'flex', gap:'10px', flexWrap:'wrap'}}>
+           <button onClick={() => changePhase(1)} className="mission-btn" style={{flex:1, margin:0, background:'#eab308', fontSize:'0.9rem'}}>Promote ⬆</button>
+           <button onClick={() => changePhase(-1)} className="mission-btn" style={{flex:1, margin:0, background:'#ef4444', fontSize:'0.9rem'}}>Demote ⬇</button>
+           <button onClick={downloadLogs} className="mission-btn" style={{flex:1, margin:0, background:'#4a5568', fontSize:'0.9rem'}}>Download</button>
+        </div>
+      </div>
+
+      {/* Mobile Tabs for Coach */}
+      <div style={{display:'flex', borderBottom:'1px solid #334155'}}>
+        <button 
+          onClick={() => setActiveTab('logs')}
+          style={{flex:1, padding:'15px', background: activeTab==='logs' ? '#2d3748' : 'transparent', color: activeTab==='logs'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold', cursor:'pointer'}}
+        >
+          Food & Workout
+        </button>
+        <button 
+          onClick={() => setActiveTab('chat')}
+          style={{flex:1, padding:'15px', background: activeTab==='chat' ? '#2d3748' : 'transparent', color: activeTab==='chat'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold', cursor:'pointer'}}
+        >
+          Chat
+        </button>
+      </div>
+
+      {/* TAB CONTENT */}
+      <div style={{flex:1, overflow:'hidden', position:'relative'}}>
+        
+        {/* VIEW 1: LOGS & WORKOUT */}
+        {activeTab === 'logs' && (
+          <div style={{height:'100%', overflowY:'auto', padding:'15px'}}>
+             <div style={{background:'#2d3748', padding:'15px', borderRadius:'8px', marginBottom:'20px', border:'1px solid #334155'}}>
+                <div style={{fontSize:'0.8rem', color:'#94a3b8', marginBottom:'5px'}}>TODAY'S WORKOUT</div>
+                <div style={{color:'white', whiteSpace:'pre-wrap'}}>{workout}</div>
+             </div>
+
+             <h3 style={{color:'#94a3b8', borderBottom:'1px solid #334155', paddingBottom:'10px', marginTop:0}}>History</h3>
+             {logs.map(log => (
+                <div key={log.id} style={{padding:'10px', borderBottom:'1px solid #2d3748'}}>
+                  <div style={{fontSize:'0.8rem', color:'#64748b'}}>{log.date_string} - {log.meal}</div>
+                  <div style={{fontWeight:'500'}}>{log.item}</div>
+                  <div style={{color:'#5daca5'}}>{log.quantity}</div>
+                </div>
+             ))}
           </div>
-        </div>
-        <div style={{display:'flex', gap:'10px'}}>
-           <button onClick={promoteClient} className="mission-btn" style={{width:'auto', margin:0, background:'#eab308'}}>Promote Client ⬆</button>
-           <button onClick={downloadLogs} className="mission-btn" style={{width:'auto', margin:0, background:'#2d3748', border:'1px solid #4a5568'}}>Download Data</button>
-        </div>
-      </div>
+        )}
 
-      <div style={{background:'#1a1d23', padding:'15px', borderRadius:'8px', marginBottom:'20px', border:'1px solid #334155'}}>
-        <div style={{fontSize:'0.8rem', color:'#94a3b8', marginBottom:'5px'}}>TODAY'S WORKOUT</div>
-        <div style={{color:'white', whiteSpace:'pre-wrap'}}>{workout}</div>
-      </div>
-
-      <div style={{display:'flex', gap:'20px', flex:1, overflow:'hidden'}}>
-        <div style={{flex:1, overflowY:'auto', border:'1px solid #334155', borderRadius:'8px', padding:'15px', background:'#1a1d23'}}>
-          <h3 style={{color:'#94a3b8', borderBottom:'1px solid #334155', paddingBottom:'10px', marginTop:0}}>Food Log History</h3>
-          {logs.map(log => (
-            <div key={log.id} style={{padding:'10px', borderBottom:'1px solid #2d3748'}}>
-              <div style={{fontSize:'0.8rem', color:'#64748b'}}>{log.date_string} - {log.meal}</div>
-              <div style={{fontWeight:'500'}}>{log.item}</div>
-              <div style={{color:'#5daca5'}}>{log.quantity}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{flex:1, display:'flex', flexDirection:'column'}}>
-           <h3 style={{color:'#94a3b8', marginTop:0}}>Chat</h3>
+        {/* VIEW 2: CHAT */}
+        {activeTab === 'chat' && (
            <ChatInterface currentUserEmail={coachEmail} chatPath={`users/${client.email}/messages`} />
-        </div>
+        )}
+
       </div>
     </div>
   );
