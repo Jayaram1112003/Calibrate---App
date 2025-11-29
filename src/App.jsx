@@ -332,6 +332,7 @@ function ClientProfile({ user, phaseInfo }) {
 // --- COACH APP (Mobile Friendly Version) ---
 // --- COACH APP (Fixed Layout) ---
 // --- COACH APP (Gap Fixed) ---
+// --- COACH APP (Gap Destroyed) ---
 function CoachApp({ user }) {
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -354,8 +355,10 @@ function CoachApp({ user }) {
   };
 
   return (
-    <div className="app-container animate-page">
-      <div className="top-header" style={{zIndex:100}}>
+    <div className="app-container animate-page" style={{display:'flex', flexDirection:'column', height:'100dvh'}}>
+      
+      {/* HEADER: Sticky at top */}
+      <div className="top-header" style={{flexShrink:0, zIndex:100}}>
         <h1>Coach Dashboard</h1>
         <select className="coach-select" onChange={handleSelect} value={selectedClient?.email || ""}>
           <option value="">-- Select a Client --</option>
@@ -367,8 +370,17 @@ function CoachApp({ user }) {
         </select>
       </div>
 
-      {/* NEW CLASS: .coach-content-wrapper forces top alignment */}
-      <div className="coach-content-wrapper">
+      {/* BODY: Force it to start immediately below header */}
+      <div style={{
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        justifyContent: 'flex-start', /* SNAP TO TOP */
+        marginTop: 0, 
+        paddingTop: 0, 
+        overflow: 'hidden',
+        background: '#1a1d23'
+      }}>
         {selectedClient ? (
           <CoachClientDetail client={selectedClient} coachEmail={user.email} />
         ) : (
