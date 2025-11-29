@@ -21,14 +21,13 @@ html, body {
 /* --- LAYOUT UTILITIES --- */
 .app-container {
   width: 100%; 
-  max-width: 100%;         /* CHANGED: Was 600px. Now forces full width. */
+  max-width: 100%;  /* <--- MAKE SURE THIS SAYS 100% */
   margin: 0 auto;
   min-height: 100dvh; 
   height: 100%;
   background: #1a1d23;
   position: relative; 
   padding-bottom: 80px;
-  box-shadow: none;        /* REMOVED: Shadow isn't needed if full screen */
   display: flex; 
   flex-direction: column;
 }
