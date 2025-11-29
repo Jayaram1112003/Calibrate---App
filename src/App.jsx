@@ -242,6 +242,7 @@ function ClientProfile({ user, phaseInfo }) {
 // ==========================================
 // COACH APP (Revised Layout)
 // ==========================================
+// --- COACH APP (Fixed Scrolling) ---
 function CoachApp({ user }) {
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -259,7 +260,7 @@ function CoachApp({ user }) {
 
   return (
     <div className="coach-container">
-      {/* HEADER WITH LOGOUT */}
+      {/* HEADER */}
       <div className="coach-header">
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
           <h1>Coach Dashboard</h1>
@@ -272,8 +273,8 @@ function CoachApp({ user }) {
         </select>
       </div>
 
-      {/* BODY */}
-      <div className="coach-scroll-area">
+      {/* BODY - NOW LOCKED (No Outer Scroll) */}
+      <div className="coach-scroll-area" style={{overflow:'hidden', display:'flex', flexDirection:'column'}}>
         {selectedClient ? <CoachClientDetail client={selectedClient} coachEmail={user.email} /> : 
           <div style={{padding:'50px', textAlign:'center', color:'#64748b'}}>Select a client to begin</div>
         }
@@ -303,9 +304,9 @@ function CoachClientDetail({ client, coachEmail }) {
   };
 
   return (
-    <div style={{minHeight:'100%', display:'flex', flexDirection:'column'}}>
-      {/* INFO CARD */}
-      <div style={{padding:'15px', background:'#252a33', borderBottom:'1px solid #334155'}}>
+    <div style={{height:'100%', display:'flex', flexDirection:'column'}}>
+      {/* STATIC INFO CARD (Never Scrolls) */}
+      <div style={{padding:'15px', background:'#252a33', borderBottom:'1px solid #334155', flexShrink: 0}}>
         <div style={{color:'#94a3b8', fontSize:'0.8rem'}}>PHASE: {PHASES[client.currentPhase||1].name}</div>
         <div style={{display:'flex', gap:'10px', marginTop:'10px'}}>
           <button onClick={() => changePhase(1)} className="mission-btn" style={{margin:0, flex:1, background:'#eab308'}}>Promote</button>
@@ -313,23 +314,28 @@ function CoachClientDetail({ client, coachEmail }) {
         </div>
       </div>
 
-      {/* TABS */}
-      <div style={{display:'flex', borderBottom:'1px solid #334155'}}>
+      {/* STATIC TABS (Never Scrolls) */}
+      <div style={{display:'flex', borderBottom:'1px solid #334155', flexShrink: 0}}>
         <button onClick={() => setActiveTab('logs')} style={{flex:1, padding:'15px', background: activeTab==='logs'?'#2d3748':'transparent', color:'white', border:'none'}}>Logs</button>
         <button onClick={() => setActiveTab('chat')} style={{flex:1, padding:'15px', background: activeTab==='chat'?'#2d3748':'transparent', color:'white', border:'none'}}>Chat</button>
       </div>
 
-      {/* CONTENT */}
-      <div style={{padding:'15px', flex:1, display:'flex', flexDirection:'column'}}>
-        {activeTab === 'logs' && logs.map(l => (
-          <div key={l.id} className="log-item">
-            <div>{l.item}</div><div style={{color:'#5daca5'}}>{l.quantity}</div>
-          </div>
-        ))}
-        {activeTab === 'chat' && (
+      {/* SCROLLABLE CONTENT AREA */}
+      {activeTab === 'logs' && (
+        <div style={{flex:1, overflowY:'auto', padding:'15px'}}>
+          {logs.map(l => (
+            <div key={l.id} className="log-item">
+              <div>{l.item}</div><div style={{color:'#5daca5'}}>{l.quantity}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeTab === 'chat' && (
+        <div style={{flex:1, overflow:'hidden', padding:'15px', display:'flex', flexDirection:'column'}}>
            <ChatInterface currentUserEmail={coachEmail} chatPath={`users/${client.email}/messages`} />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -346,7 +352,8 @@ function ChatInterface({ currentUserEmail, chatPath }) {
       const m = snap.docs.map(d => ({id:d.id, ...d.data()}));
       m.sort((a,b) => (a.timestamp?.seconds||0) - (b.timestamp?.seconds||0));
       setMessages(m);
-      setTimeout(() => dummyDiv.current?.scrollIntoView({behavior:'smooth'}), 100);
+      // FIX: 'nearest' prevents the whole page from jumping up
+      setTimeout(() => dummyDiv.current?.scrollIntoView({behavior:'smooth', block:'nearest'}), 100);
     });
     return () => unsub();
   }, [chatPath]);
@@ -360,13 +367,13 @@ function ChatInterface({ currentUserEmail, chatPath }) {
   const deleteMsg = async (id) => { if(confirm("Delete?")) await updateDoc(doc(db, chatPath, id), { text: "🚫 Deleted", isDeleted: true }); };
 
   return (
-    <div className="chat-window">
+    <div className="chat-window" style={{height:'100%'}}>
       <div className="messages-area">
         {messages.map(m => {
           const isMine = m.sender === currentUserEmail;
           return (
             <div key={m.id} className={`msg-row ${isMine?'mine':'theirs'}`}>
-              {isMine && !m.isDeleted && <button className="icon-btn" onClick={() => deleteMsg(m.id)}>🗑️</button>}
+              {isMine && !m.isDeleted && <button className="delete-btn-outside" onClick={() => deleteMsg(m.id)}>🗑️</button>}
               <div className={`message-bubble ${isMine?'msg-mine':'msg-theirs'}`} style={m.isDeleted?{opacity:0.5}:{}}>{m.text}</div>
             </div>
           );
