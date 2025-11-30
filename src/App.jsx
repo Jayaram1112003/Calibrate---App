@@ -208,14 +208,17 @@ function ClientLog({ user }) {
   const [workout, setWorkout] = useState("");
   const [workoutId, setWorkoutId] = useState(null);
   
-  // NEW: Date Navigation State
+  // Date State
   const [viewDate, setViewDate] = useState(new Date());
   
   const getFormattedDate = (d) => d.toLocaleDateString();
   const viewDateString = getFormattedDate(viewDate);
-  const isToday = viewDateString === new Date().toLocaleDateString();
+  const isToday = viewDateString === new Date().toLocaleDateString(); // Check if today
 
   const changeDate = (days) => {
+    // PREVENT FUTURE DATES
+    if (isToday && days > 0) return; 
+
     const newDate = new Date(viewDate);
     newDate.setDate(newDate.getDate() + days);
     setViewDate(newDate);
@@ -253,6 +256,7 @@ function ClientLog({ user }) {
   };
 
   const deleteLog = async (id) => { if(confirm("Delete?")) await deleteDoc(doc(db, "food_logs", id)); };
+  
   const editLog = async (log) => {
     const newItem = prompt("Update Item:", log.item); if(!newItem) return;
     const newQty = prompt("Update Qty:", log.quantity); if(!newQty) return;
@@ -263,12 +267,23 @@ function ClientLog({ user }) {
     <div>
       <div className="client-header">
         <div className="date-nav-header">
+          {/* Left Arrow (Always Active) */}
           <button className="nav-arrow-btn" onClick={() => changeDate(-1)}>◀</button>
+          
           <div style={{textAlign:'center'}}>
             <h1 style={{fontSize:'1.2rem'}}>{isToday ? "Today's Log" : viewDateString}</h1>
-            {!isToday && <p style={{fontSize:'0.7rem', color:'#94a3b8', margin:0}}>History View</p>}
+            {!isToday && <p style={{fontSize:'0.7rem', margin:0, color:'#94a3b8'}}>History View</p>}
           </div>
-          <button className="nav-arrow-btn" onClick={() => changeDate(1)}>▶</button>
+
+          {/* Right Arrow (Disabled if Today) */}
+          <button 
+            className="nav-arrow-btn" 
+            onClick={() => changeDate(1)}
+            disabled={isToday} // Logic disable
+            style={{opacity: isToday ? 0.3 : 1, cursor: isToday ? 'not-allowed' : 'pointer'}} // Visual disable
+          >
+            ▶
+          </button>
         </div>
       </div>
       
@@ -424,6 +439,8 @@ function CoachClientDetail({ client, coachEmail }) {
   const [activeTab, setActiveTab] = useState('logs');
   const [logs, setLogs] = useState([]);
   const [workout, setWorkout] = useState("No workout");
+  
+  // Standard Meal Order for Report
   const MEAL_ORDER = ["Breakfast", "Morning Snack", "Lunch", "Evening Snack", "Dinner"];
 
   useEffect(() => {
@@ -441,12 +458,6 @@ function CoachClientDetail({ client, coachEmail }) {
       else setWorkout("No workout logged today");
     });
 
-    // Clear notification when Coach opens this client
-    if(client.hasUnreadMsg) {
-       // We can't update user doc here easily without triggering loop, 
-       // so we do it when opening the Chat tab specifically or just assume selection = read
-    }
-
     return () => { unsub(); unsubW(); };
   }, [client]);
 
@@ -456,10 +467,55 @@ function CoachClientDetail({ client, coachEmail }) {
     if(confirm(`Move to Phase ${next}?`)) await updateDoc(doc(db, "users", client.email), { currentPhase: next, celebratePromotion: dir===1 });
   };
 
+  // --- NEW: Download Function for Coach ---
   const downloadLogs = () => {
-    // ... (Same download logic as previous step) ...
-    // Simplified for brevity in this Paste block, reusing logic from Client Profile if needed
-    alert("Use the logic from previous steps for full report or copy from ClientProfile above.");
+    if(!window.confirm(`Download report for ${client.email}?`)) return;
+
+    // 1. Sort logs by Date
+    const sortedLogs = [...logs].sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
+
+    // 2. Group by Date -> Meal
+    const grouped = {};
+    sortedLogs.forEach(log => {
+      if (!grouped[log.date_string]) grouped[log.date_string] = {};
+      if (!grouped[log.date_string][log.meal]) grouped[log.date_string][log.meal] = [];
+      grouped[log.date_string][log.meal].push(log);
+    });
+
+    // 3. Generate HTML/Word Doc
+    let docContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset='utf-8'><title>Coach Report</title></head>
+      <body>
+      <h1>Client Report: ${client.email}</h1>
+      <p><b>Phase:</b> ${PHASES[client.currentPhase || 1].name}<br/><b>Generated:</b> ${new Date().toLocaleString()}</p>
+      <hr/>
+    `;
+
+    Object.keys(grouped).forEach(date => {
+      docContent += `<h3 style='background:#eee; padding:5px;'>📅 ${date}</h3>`;
+      const meals = grouped[date];
+      MEAL_ORDER.forEach(meal => {
+        if (meals[meal]) {
+          docContent += `<u>${meal}</u><ul>`;
+          meals[meal].forEach(item => {
+            docContent += `<li><b>${item.item}</b> - ${item.quantity}</li>`;
+          });
+          docContent += `</ul>`;
+        }
+      });
+    });
+
+    docContent += "</body></html>";
+
+    const blob = new Blob(['\ufeff', docContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${client.email}_Report.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -469,22 +525,32 @@ function CoachClientDetail({ client, coachEmail }) {
         <div style={{display:'flex', gap:'10px', marginTop:'10px'}}>
           <button onClick={() => changePhase(1)} className="mission-btn" style={{margin:0, flex:1, background:'#eab308'}}>Promote</button>
           <button onClick={() => changePhase(-1)} className="mission-btn" style={{margin:0, flex:1, background:'#ef4444'}}>Demote</button>
+          {/* THE DOWNLOAD BUTTON IS HERE */}
+          <button onClick={downloadLogs} className="mission-btn" style={{margin:0, flex:1, background:'#4a5568'}}>Download</button>
         </div>
       </div>
+      
       <div style={{display:'flex', borderBottom:'1px solid #334155', flexShrink:0}}>
         <button onClick={() => setActiveTab('logs')} style={{flex:1, padding:'15px', background: activeTab==='logs'?'#2d3748':'transparent', color: activeTab==='logs'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold'}}>Logs</button>
         <button onClick={() => setActiveTab('chat')} style={{flex:1, padding:'15px', background: activeTab==='chat'?'#2d3748':'transparent', color: activeTab==='chat'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold'}}>Chat</button>
       </div>
+      
       {activeTab === 'logs' && (
         <div style={{flex:1, overflowY:'auto', padding:'15px'}}>
           <div style={{background:'#2d3748', padding:'10px', borderRadius:'8px', marginBottom:'20px'}}>
              <div style={{fontSize:'0.8rem', color:'#94a3b8'}}>TODAY'S WORKOUT</div>
              <div style={{whiteSpace:'pre-wrap'}}>{workout}</div>
           </div>
-          {/* Grouped Logs Logic would go here */}
-          {logs.map(l => (<div key={l.id} className="log-item"><div>{l.item}</div><div style={{color:'#5daca5'}}>{l.quantity}</div></div>))}
+          {/* Grouped Logs Logic Reused for Coach View */}
+          {logs.map(l => (
+            <div key={l.id} className="log-item">
+              <div><span style={{fontSize:'0.8rem', color:'#64748b', marginRight:'10px'}}>{l.date_string}</span> {l.item}</div>
+              <div style={{color:'#5daca5'}}>{l.quantity}</div>
+            </div>
+          ))}
         </div>
       )}
+      
       {activeTab === 'chat' && (
         <div style={{flex:1, overflow:'hidden', padding:'15px', display:'flex', flexDirection:'column'}}>
            <ChatInterface currentUserEmail={coachEmail} chatPath={`users/${client.email}/messages`} isCoach={true} targetUserEmail={client.email} />
