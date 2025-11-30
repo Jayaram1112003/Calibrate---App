@@ -471,19 +471,29 @@ function CoachApp({ user }) {
 function CoachClientDetail({ client, coachEmail }) {
   const [activeTab, setActiveTab] = useState('logs');
   const [logs, setLogs] = useState([]);
+  const [workout, setWorkout] = useState("No workout");
   
-  // Define standard meal order so they don't appear randomly
+  // Standard meal order for the report
   const MEAL_ORDER = ["Breakfast", "Morning Snack", "Lunch", "Evening Snack", "Dinner"];
 
   useEffect(() => {
+    // 1. Fetch Logs
     const q = query(collection(db, "food_logs"), where("user_email", "==", client.email));
     const unsub = onSnapshot(q, (snap) => {
       const d = snap.docs.map(doc => ({id:doc.id, ...doc.data()}));
-      // Sort by timestamp descending (Newest first)
       d.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
       setLogs(d);
     });
-    return () => unsub();
+    
+    // 2. Fetch Today's Workout
+    const today = new Date().toLocaleDateString();
+    const wQ = query(collection(db, "workouts"), where("user_email", "==", client.email), where("date_string", "==", today));
+    const unsubW = onSnapshot(wQ, (snap) => {
+      if(!snap.empty) setWorkout(snap.docs[0].data().text);
+      else setWorkout("No workout logged today");
+    });
+
+    return () => { unsub(); unsubW(); };
   }, [client]);
 
   const changePhase = async (dir) => {
@@ -492,25 +502,82 @@ function CoachClientDetail({ client, coachEmail }) {
     if(confirm(`Move to Phase ${next}?`)) await updateDoc(doc(db, "users", client.email), { currentPhase: next, celebratePromotion: dir===1 });
   };
 
-  // --- GROUPING LOGIC ---
-  // 1. Get all unique dates
-  const uniqueDates = [...new Set(logs.map(l => l.date_string))];
-  
-  // 2. Group logs by date
-  const logsByDate = {};
-  logs.forEach(log => {
-    if (!logsByDate[log.date_string]) logsByDate[log.date_string] = [];
-    logsByDate[log.date_string].push(log);
-  });
+  // --- NEW: Word Document Download Logic ---
+  const downloadLogs = () => {
+    if(!window.confirm(`Download report for ${client.email}?`)) return;
+
+    // 1. Sort logs by Date (Newest First)
+    const sortedLogs = [...logs].sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
+
+    // 2. Group by Date -> Then by Meal
+    const grouped = {};
+    sortedLogs.forEach(log => {
+      if (!grouped[log.date_string]) grouped[log.date_string] = {};
+      if (!grouped[log.date_string][log.meal]) grouped[log.date_string][log.meal] = [];
+      grouped[log.date_string][log.meal].push(log);
+    });
+
+    // 3. Build HTML String (Word Doc Format)
+    let docContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset='utf-8'><title>Coach Report</title>
+      <style>
+        body { font-family: Arial, sans-serif; }
+        h1 { color: #2d3748; }
+        .meta { color: #666; font-size: 0.9em; margin-bottom: 20px; }
+        .date-header { background: #e2e8f0; color: #1a202c; padding: 8px; font-weight: bold; margin-top: 20px; border-left: 5px solid #5daca5; }
+        .meal-header { color: #2d3748; font-weight: bold; margin-top: 10px; text-decoration: underline; }
+        li { margin-bottom: 5px; }
+        .qty { color: #5daca5; font-weight: bold; }
+      </style>
+      </head><body>
+      <h1>Calibrate Client Report</h1>
+      <div class='meta'>
+        <b>Client:</b> ${client.email}<br/>
+        <b>Current Phase:</b> ${PHASES[client.currentPhase || 1].name}<br/>
+        <b>Generated:</b> ${new Date().toLocaleString()}
+      </div>
+      <hr/>
+    `;
+
+    // Iterate through dates
+    Object.keys(grouped).forEach(date => {
+      docContent += `<div class='date-header'>📅 ${date}</div>`;
+      const meals = grouped[date];
+      MEAL_ORDER.forEach(meal => {
+        if (meals[meal]) {
+          docContent += `<div class='meal-header'>${meal}</div><ul>`;
+          meals[meal].forEach(item => {
+            docContent += `<li>${item.item} - <span class='qty'>${item.quantity}</span></li>`;
+          });
+          docContent += `</ul>`;
+        }
+      });
+    });
+
+    docContent += "</body></html>";
+
+    // 4. Trigger Download
+    const blob = new Blob(['\ufeff', docContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${client.email}_Full_Report.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div style={{height:'100%', display:'flex', flexDirection:'column'}}>
       {/* INFO CARD */}
       <div style={{padding:'15px', background:'#252a33', borderBottom:'1px solid #334155', flexShrink:0}}>
-        <div style={{color:'#94a3b8', fontSize:'0.8rem'}}>PHASE: {PHASES[client.currentPhase||1].name}</div>
-        <div style={{display:'flex', gap:'10px', marginTop:'10px'}}>
+        <div style={{color:'#94a3b8', fontSize:'0.8rem'}}>CURRENT PHASE</div>
+        <div style={{fontSize:'1.1rem', fontWeight:'bold', marginBottom:'10px'}}>{PHASES[client.currentPhase||1].name}</div>
+        <div style={{display:'flex', gap:'10px'}}>
           <button onClick={() => changePhase(1)} className="mission-btn" style={{margin:0, flex:1, background:'#eab308'}}>Promote</button>
           <button onClick={() => changePhase(-1)} className="mission-btn" style={{margin:0, flex:1, background:'#ef4444'}}>Demote</button>
+          <button onClick={downloadLogs} className="mission-btn" style={{margin:0, flex:1, background:'#4a5568'}}>Download</button>
         </div>
       </div>
 
@@ -521,52 +588,26 @@ function CoachClientDetail({ client, coachEmail }) {
       </div>
 
       {/* CONTENT AREA */}
-      <div style={{flex:1, overflowY:'auto', padding:'15px'}}>
-        
-        {activeTab === 'logs' && (
-          <div>
-             {/* If no logs exist */}
-             {uniqueDates.length === 0 && <div style={{color:'#64748b', textAlign:'center', marginTop:'20px'}}>No logs found for this client.</div>}
-
-             {/* Iterate through Dates (e.g. "11/29/2025") */}
-             {uniqueDates.map(date => (
-               <div key={date} style={{marginBottom:'25px'}}>
-                 
-                 {/* Date Header */}
-                 <div style={{background:'#5daca5', color:'white', padding:'8px 12px', borderRadius:'6px', display:'inline-block', fontSize:'0.85rem', fontWeight:'bold', marginBottom:'10px'}}>
-                   📅 {date}
-                 </div>
-
-                 {/* Group by Meal within this Date */}
-                 <div style={{background:'#2d3748', borderRadius:'12px', padding:'10px', border:'1px solid #334155'}}>
-                   {MEAL_ORDER.map(mealName => {
-                     // Find logs for this specific Date AND Meal
-                     const mealLogs = logsByDate[date].filter(l => l.meal === mealName);
-                     
-                     if (mealLogs.length === 0) return null; // Don't show empty meals
-
-                     return (
-                       <div key={mealName} style={{marginBottom:'15px', borderBottom:'1px solid #4a5568', paddingBottom:'10px'}}>
-                         <div style={{color:'#94a3b8', fontSize:'0.75rem', textTransform:'uppercase', marginBottom:'5px'}}>{mealName}</div>
-                         {mealLogs.map(log => (
-                           <div key={log.id} style={{display:'flex', justifyContent:'space-between', padding:'4px 0'}}>
-                             <span style={{color:'white'}}>{log.item}</span>
-                             <span style={{color:'#5daca5', fontWeight:'bold'}}>{log.quantity}</span>
-                           </div>
-                         ))}
-                       </div>
-                     );
-                   })}
-                 </div>
-               </div>
-             ))}
+      {activeTab === 'logs' && (
+        <div style={{flex:1, overflowY:'auto', padding:'15px'}}>
+          <div style={{background:'#2d3748', padding:'10px', borderRadius:'8px', marginBottom:'20px'}}>
+             <div style={{fontSize:'0.8rem', color:'#94a3b8'}}>TODAY'S WORKOUT</div>
+             <div style={{whiteSpace:'pre-wrap'}}>{workout}</div>
           </div>
-        )}
+          <h3 style={{marginTop:0, color:'#94a3b8'}}>History</h3>
+          {logs.map(l => (
+            <div key={l.id} className="log-item">
+              <div>{l.item}</div><div style={{color:'#5daca5'}}>{l.quantity}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
-        {activeTab === 'chat' && (
+      {activeTab === 'chat' && (
+        <div style={{flex:1, overflow:'hidden', padding:'15px', display:'flex', flexDirection:'column'}}>
            <ChatInterface currentUserEmail={coachEmail} chatPath={`users/${client.email}/messages`} />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
