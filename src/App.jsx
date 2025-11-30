@@ -6,9 +6,13 @@ import confetti from 'canvas-confetti';
 import './App.css';
 
 // --- CONFIGURATION ---
-// !!! PASTE YOUR FIREBASE KEYS HERE !!!
 const firebaseConfig = {
-  // ... paste your keys here ...
+  apiKey: "AIzaSyBcMz0Y1ivVDLVrZ4CrL28LkiDThmsnBXE",
+  authDomain: "calibrate-diet-app.firebaseapp.com",
+  projectId: "calibrate-diet-app",
+  storageBucket: "calibrate-diet-app.firebasestorage.app",
+  messagingSenderId: "638688646370",
+  appId: "1:638688646370:web:8f499c64174f773198babb"
 };
 
 const app = initializeApp(firebaseConfig);
