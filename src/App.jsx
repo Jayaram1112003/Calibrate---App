@@ -440,17 +440,20 @@ function CoachClientDetail({ client, coachEmail }) {
   const [logs, setLogs] = useState([]);
   const [workout, setWorkout] = useState("No workout");
   
-  // Standard Meal Order for Report
+  // STRICT ORDER for display and download
   const MEAL_ORDER = ["Breakfast", "Morning Snack", "Lunch", "Evening Snack", "Dinner"];
 
   useEffect(() => {
+    // Fetch Logs
     const q = query(collection(db, "food_logs"), where("user_email", "==", client.email));
     const unsub = onSnapshot(q, (snap) => {
       const d = snap.docs.map(doc => ({id:doc.id, ...doc.data()}));
+      // Sort by timestamp (Newest first) just as a baseline
       d.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
       setLogs(d);
     });
     
+    // Fetch Today's Workout
     const today = new Date().toLocaleDateString();
     const wQ = query(collection(db, "workouts"), where("user_email", "==", client.email), where("date_string", "==", today));
     const unsubW = onSnapshot(wQ, (snap) => {
@@ -467,37 +470,44 @@ function CoachClientDetail({ client, coachEmail }) {
     if(confirm(`Move to Phase ${next}?`)) await updateDoc(doc(db, "users", client.email), { currentPhase: next, celebratePromotion: dir===1 });
   };
 
-  // --- NEW: Download Function for Coach ---
-  const downloadLogs = () => {
-    if(!window.confirm(`Download report for ${client.email}?`)) return;
-
-    // 1. Sort logs by Date
-    const sortedLogs = [...logs].sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
-
-    // 2. Group by Date -> Meal
+  // --- HELPER: Group Logs by Date & Meal ---
+  const getGroupedLogs = () => {
     const grouped = {};
-    sortedLogs.forEach(log => {
+    logs.forEach(log => {
       if (!grouped[log.date_string]) grouped[log.date_string] = {};
       if (!grouped[log.date_string][log.meal]) grouped[log.date_string][log.meal] = [];
       grouped[log.date_string][log.meal].push(log);
     });
+    return grouped;
+  };
 
-    // 3. Generate HTML/Word Doc
+  const downloadLogs = () => {
+    if(!window.confirm(`Download report for ${client.email}?`)) return;
+    
+    const grouped = getGroupedLogs();
+    // Sort dates: Newest First
+    const sortedDates = Object.keys(grouped).sort((a,b) => new Date(b) - new Date(a));
+
     let docContent = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><meta charset='utf-8'><title>Coach Report</title></head>
-      <body>
-      <h1>Client Report: ${client.email}</h1>
-      <p><b>Phase:</b> ${PHASES[client.currentPhase || 1].name}<br/><b>Generated:</b> ${new Date().toLocaleString()}</p>
+      <head><meta charset='utf-8'><title>Report</title>
+      <style>
+        body{font-family:Arial} h3{background:#eee;padding:5px} .meal{color:#5daca5;font-weight:bold;margin-top:10px} li{margin-bottom:3px}
+      </style>
+      </head><body>
+      <h1>Report: ${client.email}</h1>
+      <p>Phase: ${PHASES[client.currentPhase||1].name}</p>
       <hr/>
     `;
 
-    Object.keys(grouped).forEach(date => {
-      docContent += `<h3 style='background:#eee; padding:5px;'>📅 ${date}</h3>`;
+    sortedDates.forEach(date => {
+      docContent += `<h3>📅 ${date}</h3>`;
       const meals = grouped[date];
+      
+      // Use MEAL_ORDER to ensure Breakfast comes before Lunch in the DOC
       MEAL_ORDER.forEach(meal => {
         if (meals[meal]) {
-          docContent += `<u>${meal}</u><ul>`;
+          docContent += `<div class='meal'>${meal}</div><ul>`;
           meals[meal].forEach(item => {
             docContent += `<li><b>${item.item}</b> - ${item.quantity}</li>`;
           });
@@ -507,50 +517,78 @@ function CoachClientDetail({ client, coachEmail }) {
     });
 
     docContent += "</body></html>";
-
     const blob = new Blob(['\ufeff', docContent], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
+    link.href = URL.createObjectURL(blob);
     link.download = `${client.email}_Report.doc`;
-    document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
   };
+
+  const groupedLogs = getGroupedLogs();
+  // Sort dates for UI (Newest First)
+  const sortedDatesUI = Object.keys(groupedLogs).sort((a,b) => new Date(b) - new Date(a));
 
   return (
     <div style={{height:'100%', display:'flex', flexDirection:'column'}}>
+      {/* INFO CARD */}
       <div style={{padding:'15px', background:'#252a33', borderBottom:'1px solid #334155', flexShrink:0}}>
         <div style={{color:'#94a3b8', fontSize:'0.8rem'}}>PHASE: {PHASES[client.currentPhase||1].name}</div>
         <div style={{display:'flex', gap:'10px', marginTop:'10px'}}>
           <button onClick={() => changePhase(1)} className="mission-btn" style={{margin:0, flex:1, background:'#eab308'}}>Promote</button>
           <button onClick={() => changePhase(-1)} className="mission-btn" style={{margin:0, flex:1, background:'#ef4444'}}>Demote</button>
-          {/* THE DOWNLOAD BUTTON IS HERE */}
           <button onClick={downloadLogs} className="mission-btn" style={{margin:0, flex:1, background:'#4a5568'}}>Download</button>
         </div>
       </div>
-      
+
+      {/* TABS */}
       <div style={{display:'flex', borderBottom:'1px solid #334155', flexShrink:0}}>
         <button onClick={() => setActiveTab('logs')} style={{flex:1, padding:'15px', background: activeTab==='logs'?'#2d3748':'transparent', color: activeTab==='logs'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold'}}>Logs</button>
         <button onClick={() => setActiveTab('chat')} style={{flex:1, padding:'15px', background: activeTab==='chat'?'#2d3748':'transparent', color: activeTab==='chat'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold'}}>Chat</button>
       </div>
-      
+
+      {/* CONTENT AREA */}
       {activeTab === 'logs' && (
         <div style={{flex:1, overflowY:'auto', padding:'15px'}}>
           <div style={{background:'#2d3748', padding:'10px', borderRadius:'8px', marginBottom:'20px'}}>
              <div style={{fontSize:'0.8rem', color:'#94a3b8'}}>TODAY'S WORKOUT</div>
              <div style={{whiteSpace:'pre-wrap'}}>{workout}</div>
           </div>
-          {/* Grouped Logs Logic Reused for Coach View */}
-          {logs.map(l => (
-            <div key={l.id} className="log-item">
-              <div><span style={{fontSize:'0.8rem', color:'#64748b', marginRight:'10px'}}>{l.date_string}</span> {l.item}</div>
-              <div style={{color:'#5daca5'}}>{l.quantity}</div>
+          
+          <h3 style={{marginTop:0, color:'#94a3b8'}}>History</h3>
+          
+          {sortedDatesUI.length === 0 && <div style={{color:'#64748b'}}>No logs found.</div>}
+
+          {/* Iterate Dates */}
+          {sortedDatesUI.map(date => (
+            <div key={date} style={{marginBottom:'20px'}}>
+              <div style={{background:'#5daca5', color:'#1a1d23', padding:'5px 10px', borderRadius:'4px', fontWeight:'bold', display:'inline-block', fontSize:'0.8rem', marginBottom:'10px'}}>
+                {date}
+              </div>
+              
+              <div style={{background:'#252a33', borderRadius:'8px', overflow:'hidden', border:'1px solid #334155'}}>
+                {/* Iterate Meals in Strict Order */}
+                {MEAL_ORDER.map(meal => {
+                  const mealLogs = groupedLogs[date][meal];
+                  if (!mealLogs) return null; // Skip empty meals
+
+                  return (
+                    <div key={meal} style={{padding:'10px', borderBottom:'1px solid #334155'}}>
+                      <div style={{color:'#94a3b8', fontSize:'0.7rem', textTransform:'uppercase', marginBottom:'5px'}}>{meal}</div>
+                      {mealLogs.map(log => (
+                        <div key={log.id} style={{display:'flex', justifyContent:'space-between', marginBottom:'3px'}}>
+                          <span style={{color:'white'}}>{log.item}</span>
+                          <span style={{color:'#5daca5'}}>{log.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
       )}
-      
+
       {activeTab === 'chat' && (
         <div style={{flex:1, overflow:'hidden', padding:'15px', display:'flex', flexDirection:'column'}}>
            <ChatInterface currentUserEmail={coachEmail} chatPath={`users/${client.email}/messages`} isCoach={true} targetUserEmail={client.email} />
