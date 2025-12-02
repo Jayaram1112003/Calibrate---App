@@ -1,18 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, getDoc, collection, addDoc, query, where, getDocs, onSnapshot, serverTimestamp, deleteDoc, updateDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, collection, addDoc, query, where, getDocs, onSnapshot, serverTimestamp, deleteDoc, updateDoc } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
 import './App.css';
 
 // --- CONFIGURATION ---
+// !!! PASTE YOUR FIREBASE KEYS HERE !!!
 const firebaseConfig = {
-  apiKey: "AIzaSyBcMz0Y1ivVDLVrZ4CrL28LkiDThmsnBXE",
-  authDomain: "calibrate-diet-app.firebaseapp.com",
-  projectId: "calibrate-diet-app",
-  storageBucket: "calibrate-diet-app.firebasestorage.app",
-  messagingSenderId: "638688646370",
-  appId: "1:638688646370:web:8f499c64174f773198babb"
+  // ... Paste your keys here ...
 };
 
 const app = initializeApp(firebaseConfig);
@@ -42,6 +38,13 @@ export default function App() {
           const data = userSnap.data();
           setUserData(data);
           setUser(currentUser);
+          
+          // --- NEW: SAVE DISPLAY NAME TO DB ---
+          // This ensures the Coach sees the name, not just the email
+          if (currentUser.displayName && data.displayName !== currentUser.displayName) {
+            await updateDoc(userRef, { displayName: currentUser.displayName });
+          }
+
           if (data.celebratePromotion) {
             triggerCelebration();
             await updateDoc(userRef, { celebratePromotion: false });
@@ -129,7 +132,6 @@ function NavBtn({ label, active, onClick, children, hasNotification }) {
     <button className={`nav-item ${active ? 'active' : ''}`} onClick={onClick} style={{position:'relative'}}>
       <span style={{fontSize:'1.4rem'}}>{children}</span>
       <span>{label}</span>
-      {/* RED DOT NOTIFICATION */}
       {hasNotification && <div style={{position:'absolute', top:'5px', right:'15px', width:'10px', height:'10px', background:'#ef4444', borderRadius:'50%'}}></div>}
     </button>
   );
@@ -140,14 +142,12 @@ function ClientHome({ user, phaseInfo, setTab }) {
   const [alerts, setAlerts] = useState([]);
   
   useEffect(() => {
-    // 1. Time Greeting
     const h = new Date().getHours();
     if (h>=4 && h<12) setGreeting("Good Morning!");
     else if (h>=12 && h<17) setGreeting("Good Afternoon!");
     else if (h>=17 && h<23) setGreeting("Good Evening!");
     else setGreeting("Go to sleep, Improve your health :)");
 
-    // 2. Missed Meal Check (The "Reminder")
     const checkMissedMeals = async () => {
       const today = new Date().toLocaleDateString();
       const q = query(collection(db, "food_logs"), where("user_email", "==", user.email), where("date_string", "==", today));
@@ -158,7 +158,6 @@ function ClientHome({ user, phaseInfo, setTab }) {
       if (h >= 11 && !mealsEaten.includes("Breakfast")) newAlerts.push("⚠️ Don't forget Breakfast!");
       if (h >= 15 && !mealsEaten.includes("Lunch")) newAlerts.push("⚠️ You haven't logged Lunch.");
       if (h >= 21 && !mealsEaten.includes("Dinner")) newAlerts.push("⚠️ Log your Dinner.");
-      
       setAlerts(newAlerts);
     };
     checkMissedMeals();
@@ -169,28 +168,16 @@ function ClientHome({ user, phaseInfo, setTab }) {
       <div className="client-header"><h1>Calibrate</h1><p>{phaseInfo.name}</p></div>
       <div className="welcome-card">
         <h2>{greeting}</h2>
-        
-        {/* ALERTS SECTION */}
         {alerts.length > 0 ? (
           <div style={{marginTop:'15px', display:'flex', flexDirection:'column', gap:'10px'}}>
-            {alerts.map((alert, i) => (
-              <div key={i} style={{background:'#7f1d1d', color:'#fca5a5', padding:'10px', borderRadius:'8px', fontSize:'0.9rem', fontWeight:'bold', border:'1px solid #ef4444'}}>
-                {alert}
-              </div>
-            ))}
+            {alerts.map((alert, i) => <div key={i} style={{background:'#7f1d1d', color:'#fca5a5', padding:'10px', borderRadius:'8px', fontSize:'0.9rem', fontWeight:'bold', border:'1px solid #ef4444'}}>{alert}</div>)}
             <button onClick={() => setTab('log')} style={{marginTop:'5px', background:'none', border:'none', color:'#fca5a5', textDecoration:'underline', cursor:'pointer'}}>Go to Log ➝</button>
           </div>
-        ) : (
-          <p style={{color:'#94a3b8'}}>Ready to crush your goals?</p>
-        )}
-
-        {/* Stats */}
+        ) : <p style={{color:'#94a3b8'}}>Ready to crush your goals?</p>}
+        
         <div className="stat-card" style={{justifyContent:'center', textAlign:'center', marginTop: alerts.length > 0 ? '15px' : '0'}}>
            <span style={{fontSize:'1.5rem'}}>🍴</span>
-           <div>
-             <div style={{fontSize:'0.7rem', color:'#94a3b8'}}>MEALS LOGGED TODAY</div>
-             <div style={{fontWeight:'bold'}}>Check Log Tab</div>
-           </div>
+           <div><div style={{fontSize:'0.7rem', color:'#94a3b8'}}>MEALS LOGGED TODAY</div><div style={{fontWeight:'bold'}}>Check Log Tab</div></div>
         </div>
       </div>
       <div className="mission-card">
@@ -207,18 +194,14 @@ function ClientLog({ user }) {
   const [logs, setLogs] = useState([]);
   const [workout, setWorkout] = useState("");
   const [workoutId, setWorkoutId] = useState(null);
-  
-  // Date State
   const [viewDate, setViewDate] = useState(new Date());
   
   const getFormattedDate = (d) => d.toLocaleDateString();
   const viewDateString = getFormattedDate(viewDate);
-  const isToday = viewDateString === new Date().toLocaleDateString(); // Check if today
+  const isToday = viewDateString === new Date().toLocaleDateString();
 
   const changeDate = (days) => {
-    // PREVENT FUTURE DATES
-    if (isToday && days > 0) return; 
-
+    if (isToday && days > 0) return;
     const newDate = new Date(viewDate);
     newDate.setDate(newDate.getDate() + days);
     setViewDate(newDate);
@@ -226,9 +209,7 @@ function ClientLog({ user }) {
 
   useEffect(() => {
     const q = query(collection(db, "food_logs"), where("user_email", "==", user.email), where("date_string", "==", viewDateString));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    const unsub = onSnapshot(q, (snapshot) => setLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() }))));
     
     const wQ = query(collection(db, "workouts"), where("user_email", "==", user.email), where("date_string", "==", viewDateString));
     const unsubW = onSnapshot(wQ, (snapshot) => {
@@ -236,8 +217,7 @@ function ClientLog({ user }) {
         setWorkout(snapshot.docs[0].data().text);
         setWorkoutId(snapshot.docs[0].id);
       } else {
-        setWorkout("");
-        setWorkoutId(null);
+        setWorkout(""); setWorkoutId(null);
       }
     });
     return () => { unsub(); unsubW(); };
@@ -256,7 +236,6 @@ function ClientLog({ user }) {
   };
 
   const deleteLog = async (id) => { if(confirm("Delete?")) await deleteDoc(doc(db, "food_logs", id)); };
-  
   const editLog = async (log) => {
     const newItem = prompt("Update Item:", log.item); if(!newItem) return;
     const newQty = prompt("Update Qty:", log.quantity); if(!newQty) return;
@@ -267,26 +246,11 @@ function ClientLog({ user }) {
     <div>
       <div className="client-header">
         <div className="date-nav-header">
-          {/* Left Arrow (Always Active) */}
           <button className="nav-arrow-btn" onClick={() => changeDate(-1)}>◀</button>
-          
-          <div style={{textAlign:'center'}}>
-            <h1 style={{fontSize:'1.2rem'}}>{isToday ? "Today's Log" : viewDateString}</h1>
-            {!isToday && <p style={{fontSize:'0.7rem', margin:0, color:'#94a3b8'}}>History View</p>}
-          </div>
-
-          {/* Right Arrow (Disabled if Today) */}
-          <button 
-            className="nav-arrow-btn" 
-            onClick={() => changeDate(1)}
-            disabled={isToday} // Logic disable
-            style={{opacity: isToday ? 0.3 : 1, cursor: isToday ? 'not-allowed' : 'pointer'}} // Visual disable
-          >
-            ▶
-          </button>
+          <div style={{textAlign:'center'}}><h1 style={{fontSize:'1.2rem'}}>{isToday?"Today":viewDateString}</h1>{!isToday && <p style={{fontSize:'0.7rem', margin:0, color:'#94a3b8'}}>History View</p>}</div>
+          <button className="nav-arrow-btn" onClick={() => changeDate(1)} disabled={isToday} style={{opacity: isToday ? 0.3 : 1}}>▶</button>
         </div>
       </div>
-      
       <div className="workout-card">
         <div style={{fontWeight:'bold'}}>💪 Workout ({isToday ? "Today" : viewDateString})</div>
         <textarea className="workout-input" rows="3" placeholder="Log training..." value={workout} onChange={e=>setWorkout(e.target.value)} onBlur={saveWorkout}/>
@@ -322,12 +286,8 @@ function ClientLog({ user }) {
 }
 
 function ClientChat({ user }) {
-  // Clear notification when opening chat
   useEffect(() => {
-    const clearNotif = async () => {
-      const userRef = doc(db, "users", user.email);
-      await updateDoc(userRef, { hasUnreadMsg: false });
-    };
+    const clearNotif = async () => { const userRef = doc(db, "users", user.email); await updateDoc(userRef, { hasUnreadMsg: false }); };
     clearNotif();
   }, [user.email]);
 
@@ -356,9 +316,11 @@ function ClientProfile({ user, phaseInfo }) {
       grouped[log.date_string][log.meal].push(log);
     });
 
-    let docContent = `<html><head><meta charset='utf-8'></head><body><h1>Calibrate Log: ${user.email}</h1><hr/>`;
+    let docContent = `<html><head><meta charset='utf-8'></head><body><h1>Calibrate Log: ${user.displayName || user.email}</h1><hr/>`;
     const MEAL_ORDER = ["Breakfast", "Morning Snack", "Lunch", "Evening Snack", "Dinner"];
-    Object.keys(grouped).forEach(date => {
+    const sortedDates = Object.keys(grouped).sort((a,b) => new Date(b) - new Date(a));
+    
+    sortedDates.forEach(date => {
       docContent += `<h3>📅 ${date}</h3>`;
       const meals = grouped[date];
       MEAL_ORDER.forEach(meal => {
@@ -423,7 +385,7 @@ function CoachApp({ user }) {
           <option value="">-- Select Client --</option>
           {clients.map(c => (
             <option key={c.email} value={c.email}>
-              {c.hasUnreadMsg ? "🔴 " : ""}{c.email}
+              {c.hasUnreadMsg ? "🔴 " : ""}{c.displayName || c.email} ({PHASES[c.currentPhase||1].name})
             </option>
           ))}
         </select>
@@ -439,21 +401,16 @@ function CoachClientDetail({ client, coachEmail }) {
   const [activeTab, setActiveTab] = useState('logs');
   const [logs, setLogs] = useState([]);
   const [workout, setWorkout] = useState("No workout");
-  
-  // STRICT ORDER for display and download
   const MEAL_ORDER = ["Breakfast", "Morning Snack", "Lunch", "Evening Snack", "Dinner"];
 
   useEffect(() => {
-    // Fetch Logs
     const q = query(collection(db, "food_logs"), where("user_email", "==", client.email));
     const unsub = onSnapshot(q, (snap) => {
       const d = snap.docs.map(doc => ({id:doc.id, ...doc.data()}));
-      // Sort by timestamp (Newest first) just as a baseline
       d.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
       setLogs(d);
     });
     
-    // Fetch Today's Workout
     const today = new Date().toLocaleDateString();
     const wQ = query(collection(db, "workouts"), where("user_email", "==", client.email), where("date_string", "==", today));
     const unsubW = onSnapshot(wQ, (snap) => {
@@ -470,7 +427,39 @@ function CoachClientDetail({ client, coachEmail }) {
     if(confirm(`Move to Phase ${next}?`)) await updateDoc(doc(db, "users", client.email), { currentPhase: next, celebratePromotion: dir===1 });
   };
 
-  // --- HELPER: Group Logs by Date & Meal ---
+  const downloadLogs = () => {
+    if(!window.confirm(`Download report for ${client.email}?`)) return;
+    const sortedLogs = [...logs].sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
+    const grouped = {};
+    sortedLogs.forEach(log => {
+      if (!grouped[log.date_string]) grouped[log.date_string] = {};
+      if (!grouped[log.date_string][log.meal]) grouped[log.date_string][log.meal] = [];
+      grouped[log.date_string][log.meal].push(log);
+    });
+
+    let docContent = `<html><head><meta charset='utf-8'></head><body><h1>Report: ${client.displayName || client.email}</h1><p><b>Phase:</b> ${PHASES[client.currentPhase||1].name}</p><hr/>`;
+    
+    const sortedDates = Object.keys(grouped).sort((a,b) => new Date(b) - new Date(a));
+    sortedDates.forEach(date => {
+      docContent += `<h3 style='background:#eee; padding:5px;'>📅 ${date}</h3>`;
+      const meals = grouped[date];
+      MEAL_ORDER.forEach(meal => {
+        if (meals[meal]) {
+          docContent += `<u>${meal}</u><ul>`;
+          meals[meal].forEach(item => { docContent += `<li><b>${item.item}</b> - ${item.quantity}</li>`; });
+          docContent += `</ul>`;
+        }
+      });
+    });
+    docContent += "</body></html>";
+    const blob = new Blob(['\ufeff', docContent], { type: 'application/msword' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${client.email}_Report.doc`;
+    link.click();
+  };
+
+  // HELPER: Group logs for UI
   const getGroupedLogs = () => {
     const grouped = {};
     logs.forEach(log => {
@@ -480,73 +469,24 @@ function CoachClientDetail({ client, coachEmail }) {
     });
     return grouped;
   };
-
-  const downloadLogs = () => {
-    if(!window.confirm(`Download report for ${client.email}?`)) return;
-    
-    const grouped = getGroupedLogs();
-    // Sort dates: Newest First
-    const sortedDates = Object.keys(grouped).sort((a,b) => new Date(b) - new Date(a));
-
-    let docContent = `
-      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><meta charset='utf-8'><title>Report</title>
-      <style>
-        body{font-family:Arial} h3{background:#eee;padding:5px} .meal{color:#5daca5;font-weight:bold;margin-top:10px} li{margin-bottom:3px}
-      </style>
-      </head><body>
-      <h1>Report: ${client.email}</h1>
-      <p>Phase: ${PHASES[client.currentPhase||1].name}</p>
-      <hr/>
-    `;
-
-    sortedDates.forEach(date => {
-      docContent += `<h3>📅 ${date}</h3>`;
-      const meals = grouped[date];
-      
-      // Use MEAL_ORDER to ensure Breakfast comes before Lunch in the DOC
-      MEAL_ORDER.forEach(meal => {
-        if (meals[meal]) {
-          docContent += `<div class='meal'>${meal}</div><ul>`;
-          meals[meal].forEach(item => {
-            docContent += `<li><b>${item.item}</b> - ${item.quantity}</li>`;
-          });
-          docContent += `</ul>`;
-        }
-      });
-    });
-
-    docContent += "</body></html>";
-    const blob = new Blob(['\ufeff', docContent], { type: 'application/msword' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${client.email}_Report.doc`;
-    link.click();
-  };
-
   const groupedLogs = getGroupedLogs();
-  // Sort dates for UI (Newest First)
   const sortedDatesUI = Object.keys(groupedLogs).sort((a,b) => new Date(b) - new Date(a));
 
   return (
     <div style={{height:'100%', display:'flex', flexDirection:'column'}}>
-      {/* INFO CARD */}
       <div style={{padding:'15px', background:'#252a33', borderBottom:'1px solid #334155', flexShrink:0}}>
         <div style={{color:'#94a3b8', fontSize:'0.8rem'}}>PHASE: {PHASES[client.currentPhase||1].name}</div>
-        <div style={{display:'flex', gap:'10px', marginTop:'10px'}}>
+        <div style={{fontSize:'1.1rem', fontWeight:'bold', color:'white', marginBottom:'10px'}}>{client.displayName || client.email}</div>
+        <div style={{display:'flex', gap:'10px'}}>
           <button onClick={() => changePhase(1)} className="mission-btn" style={{margin:0, flex:1, background:'#eab308'}}>Promote</button>
           <button onClick={() => changePhase(-1)} className="mission-btn" style={{margin:0, flex:1, background:'#ef4444'}}>Demote</button>
           <button onClick={downloadLogs} className="mission-btn" style={{margin:0, flex:1, background:'#4a5568'}}>Download</button>
         </div>
       </div>
-
-      {/* TABS */}
       <div style={{display:'flex', borderBottom:'1px solid #334155', flexShrink:0}}>
         <button onClick={() => setActiveTab('logs')} style={{flex:1, padding:'15px', background: activeTab==='logs'?'#2d3748':'transparent', color: activeTab==='logs'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold'}}>Logs</button>
         <button onClick={() => setActiveTab('chat')} style={{flex:1, padding:'15px', background: activeTab==='chat'?'#2d3748':'transparent', color: activeTab==='chat'?'#5daca5':'#94a3b8', border:'none', fontWeight:'bold'}}>Chat</button>
       </div>
-
-      {/* CONTENT AREA */}
       {activeTab === 'logs' && (
         <div style={{flex:1, overflowY:'auto', padding:'15px'}}>
           <div style={{background:'#2d3748', padding:'10px', borderRadius:'8px', marginBottom:'20px'}}>
@@ -555,22 +495,17 @@ function CoachClientDetail({ client, coachEmail }) {
           </div>
           
           <h3 style={{marginTop:0, color:'#94a3b8'}}>History</h3>
-          
           {sortedDatesUI.length === 0 && <div style={{color:'#64748b'}}>No logs found.</div>}
 
-          {/* Iterate Dates */}
           {sortedDatesUI.map(date => (
             <div key={date} style={{marginBottom:'20px'}}>
               <div style={{background:'#5daca5', color:'#1a1d23', padding:'5px 10px', borderRadius:'4px', fontWeight:'bold', display:'inline-block', fontSize:'0.8rem', marginBottom:'10px'}}>
                 {date}
               </div>
-              
               <div style={{background:'#252a33', borderRadius:'8px', overflow:'hidden', border:'1px solid #334155'}}>
-                {/* Iterate Meals in Strict Order */}
                 {MEAL_ORDER.map(meal => {
                   const mealLogs = groupedLogs[date][meal];
-                  if (!mealLogs) return null; // Skip empty meals
-
+                  if (!mealLogs) return null;
                   return (
                     <div key={meal} style={{padding:'10px', borderBottom:'1px solid #334155'}}>
                       <div style={{color:'#94a3b8', fontSize:'0.7rem', textTransform:'uppercase', marginBottom:'5px'}}>{meal}</div>
@@ -588,7 +523,6 @@ function CoachClientDetail({ client, coachEmail }) {
           ))}
         </div>
       )}
-
       {activeTab === 'chat' && (
         <div style={{flex:1, overflow:'hidden', padding:'15px', display:'flex', flexDirection:'column'}}>
            <ChatInterface currentUserEmail={coachEmail} chatPath={`users/${client.email}/messages`} isCoach={true} targetUserEmail={client.email} />
@@ -612,42 +546,13 @@ function ChatInterface({ currentUserEmail, chatPath, isCoach, targetUserEmail })
       setMessages(m);
       setTimeout(() => dummyDiv.current?.scrollIntoView({behavior:'smooth', block:'nearest'}), 100);
     });
-    
-    // If Coach opens chat, clear client's "unread" flag? No, coach reads it.
-    // Logic: If I am opening this, I am reading it.
-    if (isCoach) {
-        // Coach read client's message? We don't have a specific flag for "Coach has unread".
-        // We implemented "Client has unread" and "Coach sees dot".
-        // Actually, for simple MVP:
-        // Coach sees dot if Client has sent msg.
-    } else {
-       // Client opening: Clear their unread flag
-       const clear = async () => await updateDoc(doc(db, "users", currentUserEmail), { hasUnreadMsg: false });
-       clear();
-    }
-
     return () => unsub();
   }, [chatPath]);
 
   const send = async () => {
     if(!input.trim()) return;
     await addDoc(collection(db, chatPath), { text: input, sender: currentUserEmail, timestamp: serverTimestamp(), isDeleted: false });
-    
-    // NOTIFICATION LOGIC
-    if (isCoach) {
-      // Coach sending -> Set Client's unread flag to TRUE
-      await updateDoc(doc(db, "users", targetUserEmail), { hasUnreadMsg: true });
-    } else {
-      // Client sending -> We want Coach to see a dot.
-      // We can set a flag on the client doc "coachHasUnreadFromThisClient: true"
-      await updateDoc(doc(db, "users", currentUserEmail), { hasUnreadMsg: true }); 
-      // Note: Reusing the same flag for simplicity. If flag is true, RED DOT appears.
-      // Logic: If I (client) send, I turn the flag ON.
-      // If Coach sees flag ON, show red dot.
-      // If Coach opens chat, turn flag OFF? Or Client opens chat turn OFF?
-      // Let's stick to: Client sends -> Flag ON. Coach Selects Client -> Flag OFF.
-    }
-    
+    if (isCoach) await updateDoc(doc(db, "users", targetUserEmail), { hasUnreadMsg: true });
     setInput("");
   };
 
